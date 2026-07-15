@@ -439,7 +439,7 @@ QString DXLabSuiteCommanderTransceiver::command_with_reply (QString const& cmd)
 
   QString result = commander_->readAll ();
 
-  if (result != NULL)
+  if (!result.isNull ())
   {
   CAT_TRACE (cmd << " -> " << QString {result});
   return result;                // converting raw UTF-8 bytes to QString

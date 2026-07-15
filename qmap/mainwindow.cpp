@@ -154,7 +154,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 // Create "m_worked", a dictionary of all calls in wsjt.log
   QFile f("wsjt.log");
-  f.open(QIODevice::ReadOnly);
+  (void) f.open(QIODevice::ReadOnly);
   if(f.isOpen()) {
     QTextStream in(&f);
     QString line,t,callsign;

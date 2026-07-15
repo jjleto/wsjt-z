@@ -311,7 +311,7 @@ int main(int argc, char *argv[])
       }
 
       // create writeable data directory if not already there
-      auto writeable_data_dir = QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)};
+      auto writeable_data_dir = QDir {QStandardPaths::writableLocation (QStandardPaths::AppLocalDataLocation)};
       if (!writeable_data_dir.mkpath ("."))
         {
           MessageBox::critical_message (nullptr, a.translate ("main", "Failed to create data directory"),
@@ -357,7 +357,7 @@ int main(int argc, char *argv[])
                       auto const& value = multi_settings.settings ()->value (key);
                       if (value.canConvert<QVariantList> ())
                         {
-                          auto const sequence = value.value<QSequentialIterable> ();
+                          auto const sequence = value.toList ();
                           strm << key << ":\n";
                           for (auto const& item: sequence)
                             {

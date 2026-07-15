@@ -53,51 +53,51 @@ void register_types ()
   item_editor_factory->registerEditor (qMetaTypeId<QDateTime> (), new QStandardItemEditorCreator<DateTimeEdit> ());
 
   // V101 Frequency list model
-  qRegisterMetaTypeStreamOperators<FrequencyList_v2_101::Item> ("Item_v2_101");
+  /* removed for Qt6 */
   QMetaType::registerConverter<FrequencyList_v2_101::Item, QString> (&FrequencyList_v2_101::Item::toString);
-  qRegisterMetaTypeStreamOperators<FrequencyList_v2_101::FrequencyItems> ("FrequencyItems_v2_101");
+  /* removed for Qt6 */
 
   // V100 Frequency list model
-  qRegisterMetaTypeStreamOperators<FrequencyList_v2::Item> ("Item_v2");
-  qRegisterMetaTypeStreamOperators<FrequencyList_v2::FrequencyItems> ("FrequencyItems_v2");
+  /* removed for Qt6 */
+  /* removed for Qt6 */
 
   // defunct old versions
-  qRegisterMetaTypeStreamOperators<FrequencyList::Item> ("Item");
-  qRegisterMetaTypeStreamOperators<FrequencyList::FrequencyItems> ("FrequencyItems");
+  /* removed for Qt6 */
+  /* removed for Qt6 */
 
   // Audio device
   qRegisterMetaType<AudioDevice::Channel> ("AudioDevice::Channel");
 
   // Configuration
-  qRegisterMetaTypeStreamOperators<Configuration::DataMode> ("Configuration::DataMode");
-  qRegisterMetaTypeStreamOperators<Configuration::Type2MsgGen> ("Configuration::Type2MsgGen");
+  /* removed for Qt6 */
+  /* removed for Qt6 */
 
   // Station details
   qRegisterMetaType<StationList::Station> ("Station");
   QMetaType::registerConverter<StationList::Station, QString> (&StationList::Station::toString);
   qRegisterMetaType<StationList::Stations> ("Stations");
-  qRegisterMetaTypeStreamOperators<StationList::Station> ("Station");
-  qRegisterMetaTypeStreamOperators<StationList::Stations> ("Stations");
+  /* removed for Qt6 */
+  /* removed for Qt6 */
 
   // Transceiver
   qRegisterMetaType<Transceiver::TransceiverState> ("Transceiver::TransceiverState");
 
   // Transceiver factory
-  qRegisterMetaTypeStreamOperators<TransceiverFactory::DataBits> ("TransceiverFactory::DataBits");
-  qRegisterMetaTypeStreamOperators<TransceiverFactory::StopBits> ("TransceiverFactory::StopBits");
-  qRegisterMetaTypeStreamOperators<TransceiverFactory::Handshake> ("TransceiverFactory::Handshake");
-  qRegisterMetaTypeStreamOperators<TransceiverFactory::PTTMethod> ("TransceiverFactory::PTTMethod");
-  qRegisterMetaTypeStreamOperators<TransceiverFactory::TXAudioSource> ("TransceiverFactory::TXAudioSource");
-  qRegisterMetaTypeStreamOperators<TransceiverFactory::SplitMode> ("TransceiverFactory::SplitMode");
+  /* removed for Qt6 */
+  /* removed for Qt6 */
+  /* removed for Qt6 */
+  /* removed for Qt6 */
+  /* removed for Qt6 */
+  /* removed for Qt6 */
 
   // Waterfall palette
-  qRegisterMetaTypeStreamOperators<WFPalette::Colours> ("Colours");
+  /* removed for Qt6 */
 
   // IARURegions
-  qRegisterMetaTypeStreamOperators<IARURegions::Region> ("IARURegions::Region");
+  /* removed for Qt6 */
 
   // DecodeHighlightingModel
-  qRegisterMetaTypeStreamOperators<DecodeHighlightingModel::HighlightInfo> ("HighlightInfo");
+  /* removed for Qt6 */
   QMetaType::registerConverter<DecodeHighlightingModel::HighlightInfo, QString> (&DecodeHighlightingModel::HighlightInfo::toString);
-  qRegisterMetaTypeStreamOperators<DecodeHighlightingModel::HighlightItems> ("HighlightItems");
+  /* removed for Qt6 */
 }

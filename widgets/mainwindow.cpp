@@ -21,8 +21,6 @@
 #include <QTextBlock>
 #include <QProgressBar>
 #include <QLineEdit>
-#include <QRegExpValidator>
-#include <QRegExp>
 #include <QRegularExpression>
 #include <QDesktopServices>
 #include <QUrl>
@@ -269,7 +267,7 @@ int* ipc_qmap;
 namespace
 {
   Radio::Frequency constexpr default_frequency {14074000};
-  QRegExp message_alphabet {"[- @A-Za-z0-9+./?#<>;$]*"};
+  QRegularExpression message_alphabet {"[- @A-Za-z0-9+./?#<>;$]*"};
   // grid exact match excluding RR73
   QRegularExpression grid_regexp {"\\A(?![Rr]{2}73)[A-Ra-r]{2}[0-9]{2}([A-Xa-x]{2}){0,1}\\z"};
   QRegularExpression non_r_db_regexp {"\\A[-+]{1}[0-9]{1,2}\\z"};
@@ -1047,12 +1045,12 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
                                                             , QMessageBox::ActionRole);
 
   // set up message text validators
-  ui->tx1->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx2->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx3->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx4->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx5->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx6->setValidator (new QRegExpValidator {message_alphabet, this});
+  ui->tx1->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx2->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx3->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx4->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx5->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx6->setValidator (new QRegularExpressionValidator {message_alphabet, this});
 
   // Free text macros model to widget hook up.
   ui->tx5->setModel (m_config.macros ());
@@ -2512,11 +2510,9 @@ QString MainWindow::save_wave_file (QString const& name, short const * data, int
   // without suitable synchronization.
   //
   QAudioFormat format;
-  format.setCodec ("audio/pcm");
   format.setSampleRate (12000);
   format.setChannelCount (1);
-  format.setSampleSize (16);
-  format.setSampleType (QAudioFormat::SignedInt);
+  format.setSampleFormat (QAudioFormat::Int16);
   auto source = QString {"%1; %2"}.arg (my_callsign).arg (my_grid);
   auto comment = QString {"Mode=%1%2; Freq=%3%4"}
                    .arg (mode)
@@ -2975,10 +2971,10 @@ void MainWindow::keyPressEvent (QKeyEvent * e)
   if(SpecOp::FOX == m_specOp) {
     switch (e->key()) {
       case Qt::Key_Return:
-        doubleClickOnCall2(Qt::KeyboardModifier(Qt::ShiftModifier + Qt::ControlModifier + Qt::AltModifier));
+        doubleClickOnCall2(Qt::KeyboardModifier(int(Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier)));
         return;
       case Qt::Key_Enter:
-        doubleClickOnCall2(Qt::KeyboardModifier(Qt::ShiftModifier + Qt::ControlModifier + Qt::AltModifier));
+        doubleClickOnCall2(Qt::KeyboardModifier(int(Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier)));
         return;
       case Qt::Key_Backspace:
         qDebug() << "Key Backspace";
@@ -3590,7 +3586,7 @@ void MainWindow::update_mode_switch_status_label ()
     {
       ui->pb_BandChangeNow->setVisible (true);
       QString bhText = ui->pte_bandHopper->toPlainText ();
-      QStringList bhList = bhText.split (QRegExp {"[\r\n]"}, SkipEmptyParts);
+      QStringList bhList = bhText.split (QRegularExpression {"[\r\n]"}, SkipEmptyParts);
       int now = QDateTime::currentDateTimeUtc ().toString ("hh").toInt ();
       int targeth = -1;
       QString target;
@@ -4353,7 +4349,7 @@ void MainWindow::read_wav_file (QString const& fname)
         // zero unfilled remaining sample space
           std::memset(&dec_data.d2[frames_read],0,max_bytes - n);
           if (11025 == file.format ().sampleRate ()) {
-            short sample_size = file.format ().sampleSize ();
+            short sample_size = file.format ().bytesPerSample () * 8;
             wav12_ (dec_data.d2, dec_data.d2, &frames_read, &sample_size);
           }
           dec_data.params.kin = frames_read;
@@ -5033,7 +5029,7 @@ void MainWindow::read_log()
   // main window paint immediately and the score updates when results arrive.
   // Called once from the ctor (Q65 mode only) before any QSO can be logged,
   // so there is no writer racing us on m_EMEworked / m_score.
-  auto const path = QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}
+  auto const path = QDir {QStandardPaths::writableLocation (QStandardPaths::AppLocalDataLocation)}
                     .absoluteFilePath ("wsjtx.log");
   using Result = QPair<QHash<QString, bool>, int>;
   auto * watcher = new QFutureWatcher<Result> (this);
@@ -6091,7 +6087,7 @@ void MainWindow::readFromStdout()                             //readFromStdout
             if(f.open(QIODevice::ReadOnly | QIODevice::Text)) {
               QTextStream s(&f);
               QString t=s.readAll();
-              if (t != NULL) m_msgAvgWidget->displayAvg(t);
+              if (!t.isNull ()) m_msgAvgWidget->displayAvg(t);
               else qDebug() << "tmp==NULL at s.readAll";
             }
           }
@@ -7645,7 +7641,7 @@ void MainWindow::doubleClickOnCall(Qt::KeyboardModifiers modifiers)
     }
   }*/
 
-  if(modifiers==(Qt::ShiftModifier + Qt::ControlModifier + Qt::AltModifier)) {
+  if(modifiers==(Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier)) {
     //### What was the purpose of this ???  ###
     cursor.setPosition(0);
   } else {
@@ -8810,7 +8806,7 @@ void MainWindow::on_addButton_clicked()                       //Add button
     if (f0.exists ()) f0.remove ();
     f1.copy (old_path);                       // copying as we want to
                                               // preserve symlinks
-    f1.open (QFile::WriteOnly | QFile::Text); // truncates
+    (void) f1.open (QFile::WriteOnly | QFile::Text); // truncates
     f2.seek (0);
     QByteArray tmp = f2.readAll();
     if (tmp != (const char*)NULL) f1.write (tmp);                 // copy contents
@@ -8907,8 +8903,8 @@ void MainWindow::on_tx6_editingFinished()                       //tx6 edited
   QString t=ui->tx6->text().toUpper();
   if(t.indexOf(" ")>0) {
     QString t1=t.split(" ").at(1);
-    QRegExp AZ4("^[A-Z]{1,4}$");
-    QRegExp NN3("^[0-9]{1,3}$");
+    QRegularExpression AZ4("^[A-Z]{1,4}$");
+    QRegularExpression NN3("^[0-9]{1,3}$");
     m_CQtype="CQ";
     if(t1.size()<=4 and t1.contains(AZ4)) m_CQtype="CQ " + t1;
     if(t1.size()<=3 and t1.contains(NN3)) m_CQtype="CQ " + t1;
@@ -11433,7 +11429,7 @@ QChar MainWindow::current_submode () const
   if (m_mode.contains (QRegularExpression {R"(^(JT65|JT9|JT4|Q65)$)"})
       && (m_config.enable_VHF_features () || "JT4" == m_mode))
     {
-      submode = m_nSubMode + 65;
+      submode = QChar (m_nSubMode + 65);
     }
   return submode;
 }
@@ -13160,7 +13156,7 @@ list1Done:
     m_foxQSO[hc].sent=rpt;                //Report to send him
     m_foxQSO[hc].ncall=0;                 //Start a new Hound
     m_foxQSO[hc].nRR73 = 0;               //Have not sent RR73
-    m_foxQSO[hc].rcvd = -99;              //Have not received R+rpt
+    m_foxQSO[hc].rcvd = QStringLiteral ("-99");              //Have not received R+rpt
     m_foxQSO[hc].tFoxRrpt = -1;           //Have not received R+rpt
     m_foxQSO[hc].tFoxTxRR73 = -1;         //Have not sent RR73
     refreshHoundQueueDisplay();
@@ -13415,7 +13411,7 @@ void MainWindow::writeFoxTxMsgs() {
   void MainWindow::writeFoxQSO(QString const& msg)
 {
   QString t;
-  t = t.asprintf("%3d%3d%3d",m_houndQueue.count(),m_foxQSOinProgress.count(),m_foxQSO.count());
+  t = t.asprintf("%3d%3d%3d", int (m_houndQueue.count()), int (m_foxQSOinProgress.count()), int (m_foxQSO.count()));
   QFile f {m_config.writeable_data_dir ().absoluteFilePath ("FoxQSO.txt")};
   if (f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append)) {
     QTextStream out(&f);
@@ -13530,9 +13526,9 @@ void MainWindow::foxTest()
     if(line.contains("Tx1:")) {
       foxTxSequencer();
     } else {
-      t = t.asprintf("%3d %3d %3d %3d %5d   ",m_houndQueue.count(),
-                m_foxQSOinProgress.count(),m_foxQSO.count(),
-                m_loggedByFox.count(),m_tFoxTx);
+      t = t.asprintf("%3d %3d %3d %3d %5d   ", int (m_houndQueue.count()),
+                int (m_foxQSOinProgress.count()), int (m_foxQSO.count()),
+                int (m_loggedByFox.count()), m_tFoxTx);
       sdiag << t << line.mid(37).trimmed() << "\n";
     }
   }
@@ -13710,13 +13706,17 @@ void MainWindow::remote_configure (QString const& mode, quint32 frequency_tolera
                                    , QString const& dx_call, QString const& dx_grid, bool generate_messages
                                    , bool auto_cq_enabled, bool auto_call_enabled)
 {
+  qDebug() << "remote_configure called with mode=" << mode << "auto_cq=" << auto_cq_enabled << "auto_call=" << auto_call_enabled;
+
   // Handle AutoCQ/AutoCall mode changes
   if (ui->cbAutoCQ->isChecked () != auto_cq_enabled)
     {
+      qDebug() << "Setting AutoCQ to" << auto_cq_enabled;
       ui->cbAutoCQ->setChecked (auto_cq_enabled);
     }
   if (ui->cbAutoCall->isChecked () != auto_call_enabled)
     {
+      qDebug() << "Setting AutoCall to" << auto_call_enabled;
       ui->cbAutoCall->setChecked (auto_call_enabled);
     }
 
@@ -15268,7 +15268,7 @@ void MainWindow::toggleBands() {
     if (m_zdebug) log("toggleBands: ENTRY");
 
     QString bhText = ui->pte_bandHopper->toPlainText();
-  QStringList bhList = bhText.split(QRegExp("[\r\n]"), SkipEmptyParts);
+  QStringList bhList = bhText.split(QRegularExpression("[\r\n]"), SkipEmptyParts);
     int now = QDateTime::currentDateTimeUtc().toString("hh").toInt();
     int targeth = -1;
     QString target= "";
@@ -15586,7 +15586,7 @@ void MainWindow::on_actionDark_mode_triggered() {
     if (ui->actionDark_mode->isChecked()) {
         if (m_zdebug) log("Stylesheet: DARK");
         QFile file(":/qdarkstyle/style.qss");
-        file.open(QFile::ReadOnly);
+        (void) file.open(QFile::ReadOnly);
         QString styleSheet = QLatin1String(file.readAll());
         qApp->setStyleSheet(styleSheet);
         labAz.setStyleSheet ("QLabel{background-color: #005555; padding-left: 10px; padding-right: 10px}");
@@ -15657,7 +15657,7 @@ QString MainWindow::leftJustifyAppendage (QString message, QString appendage)
 {
   if (appendage.size ())
     {
-      int space_count {48 - message.size ()};
+      int space_count {48 - int (message.size ())};
       if (space_count > 0) {
         message += QString {space_count, QChar {' '}};
       }

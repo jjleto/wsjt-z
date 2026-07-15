@@ -8,12 +8,12 @@
 #include <QDateTime>
 #include <QScopedPointer>
 #include <QPointer>
-#include <QAudioInput>
+#include <QAudioSource>
 
 #include "Audio/AudioDevice.hpp"
 
-class QAudioDeviceInfo;
-class QAudioInput;
+class QAudioDevice;
+class QAudioSource;
 
 // Gets audio data from sound sample source and passes it to a sink device
 class SoundInput
@@ -32,7 +32,7 @@ public:
 
   // sink must exist from the start call until the next start call or
   // stop call
-  Q_SLOT void start(QAudioDeviceInfo const&, int framesPerBuffer, AudioDevice * sink, unsigned downSampleFactor, AudioDevice::Channel = AudioDevice::Mono);
+  Q_SLOT void start(QAudioDevice const&, int framesPerBuffer, AudioDevice * sink, unsigned downSampleFactor, AudioDevice::Channel = AudioDevice::Mono);
   Q_SLOT void suspend ();
   Q_SLOT void resume ();
   Q_SLOT void stop ();
@@ -47,7 +47,7 @@ private:
 
   bool checkStream ();
 
-  QScopedPointer<QAudioInput> m_stream;
+  QScopedPointer<QAudioSource> m_stream;
   QPointer<AudioDevice> m_sink;
   qint64 cummulative_lost_usec_;
 };

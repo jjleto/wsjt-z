@@ -89,7 +89,7 @@ void PSKReporterWidget::updateTable(QString data) {
                 receiver_records.append(QStringLiteral("%1|%2|%3").arg(callsign.toUpper(), mode, frequency));
                 int r = 0;
                 ui->pskTable->insertRow(r);
-                QString time = QDateTime::fromTime_t(reader.attributes().value("flowStartSeconds").toUInt()).toUTC().toString("hh:mm:ss");
+                QString time = QDateTime::fromSecsSinceEpoch(reader.attributes().value("flowStartSeconds").toUInt()).toUTC().toString("hh:mm:ss");
                 ui->pskTable->setItem(r,0, new QTableWidgetItem(time));
 
 

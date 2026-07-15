@@ -1,7 +1,7 @@
 #include "ClientWidget.hpp"
 
 #include <limits>
-#include <QRegExp>
+#include <QRegularExpressionValidator>
 #include <QColor>
 #include <QtWidgets>
 #include <QAction>
@@ -10,10 +10,10 @@
 
 namespace
 {
-  //QRegExp message_alphabet {"[- A-Za-z0-9+./?]*"};
-  QRegExp message_alphabet {"[- @A-Za-z0-9+./?#<>]*"};
+  //QRegularExpression message_alphabet {"[- A-Za-z0-9+./?]*"};
+  QRegularExpression message_alphabet {"[- @A-Za-z0-9+./?#<>]*"};
   QRegularExpression cq_re {"(CQ|CQDX|QRZ)[^A-Z0-9/]+"};
-  QRegExpValidator message_validator {message_alphabet};
+  QRegularExpressionValidator message_validator {message_alphabet};
   MaidenheadLocatorValidator locator_validator;
   quint32 quint32_max {std::numeric_limits<quint32>::max ()};
 

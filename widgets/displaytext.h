@@ -62,7 +62,7 @@ private:
   void mouseDoubleClickEvent (QMouseEvent *) override;
   // Z
   void mousePressEvent(QMouseEvent *) override;
-  void enterEvent(QEvent *event) override;
+  void enterEvent(QEnterEvent *event) override;
   void leaveEvent(QEvent *event) override;
 
 

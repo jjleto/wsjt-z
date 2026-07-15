@@ -6,7 +6,8 @@
 #include <QString>
 #include <QDialog>
 #include <QLineEdit>
-#include <QRegExpValidator>
+#include <QRegularExpressionValidator>
+#include <QRegularExpression>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QVBoxLayout>
@@ -28,7 +29,7 @@ public:
   {
     setWindowTitle (QApplication::applicationName () + " - " + tr ("Callsign"));
     
-    callsign_.setValidator (new QRegExpValidator {QRegExp {"[A-Za-z0-9]+"}, this});
+    callsign_.setValidator (new QRegularExpressionValidator {QRegularExpression {"[A-Za-z0-9]+"}, this});
     
     auto form_layout = new QFormLayout ();
     form_layout->addRow ("&Callsign:", &callsign_);

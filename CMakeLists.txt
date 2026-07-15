@@ -1025,11 +1025,15 @@ endif ()
 #
 
 # Widgets finds its own dependencies.
-find_package (Qt5 COMPONENTS Widgets SerialPort Multimedia PrintSupport Sql LinguistTools WebSockets REQUIRED)
+find_package (Qt6 COMPONENTS Widgets SerialPort Multimedia PrintSupport Sql LinguistTools WebSockets REQUIRED)
+
+set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD_REQUIRED ON)
+add_compile_options ($<$<COMPILE_LANGUAGE:CXX>:-Wno-error=deprecated-declarations>)
 
 if (WIN32)
   add_definitions (-DQT_NEEDS_QTMAIN)
-  find_package (Qt5AxContainer REQUIRED)
+  find_package (Qt6 REQUIRED COMPONENTS AxContainer AxServer)
 endif (WIN32)
 
 #
@@ -1190,8 +1194,8 @@ endif ()
 #
 # stuff only qmake can tell us
 #
-get_target_property (QMAKE_EXECUTABLE Qt5::qmake LOCATION)
-get_target_property (LCONVERT_EXECUTABLE Qt5::lconvert LOCATION)
+get_target_property (QMAKE_EXECUTABLE Qt6::qmake LOCATION)
+get_target_property (LCONVERT_EXECUTABLE Qt6::lconvert LOCATION)
 function (QUERY_QMAKE VAR RESULT)
   execute_process (
     COMMAND ${QMAKE_EXECUTABLE} -query ${VAR}
@@ -1453,13 +1457,13 @@ foreach (lang_ ${LANGUAGES})
 endforeach ()
 if (UPDATE_TRANSLATIONS)
   message (STATUS "UPDATE_TRANSLATIONS option is set.")
-  qt5_create_translation (
+  qt6_create_translation (
     QM_FILES ${wsjt_qt_UISRCS} ${wsjtx_UISRCS} ${wsjt_qt_CXXSRCS} ${wsjtx_CXXSRCS}
     ${TS_FILES}
     OPTIONS -I${CMAKE_CURRENT_SOURCE_DIR}
     )
 else ()
-  qt5_add_translation (QM_FILES ${TS_FILES})
+  qt6_add_translation (QM_FILES ${TS_FILES})
 endif ()
 add_custom_target (translations DEPENDS ${QM_FILES})
 set_property (DIRECTORY PROPERTY CLEAN_NO_CUSTOM TRUE)
@@ -1486,11 +1490,11 @@ add_resources (wsjtx_RESOURCES /Translations ${QM_FILES})
 configure_file (wsjtx.qrc.in wsjtx.qrc @ONLY)
 
 # UI generation
-qt5_wrap_ui (wsjt_qt_GENUISRCS ${wsjt_qt_UISRCS})
-qt5_wrap_ui (wsjtx_GENUISRCS ${wsjtx_UISRCS})
+qt6_wrap_ui (wsjt_qt_GENUISRCS ${wsjt_qt_UISRCS})
+qt6_wrap_ui (wsjtx_GENUISRCS ${wsjtx_UISRCS})
 
 # Resource generation
-qt5_add_resources (wsjtx_RESOURCES_RCC
+qt6_add_resources (wsjtx_RESOURCES_RCC
   ${CMAKE_BINARY_DIR}/wsjtx.qrc
   contrib/QDarkStyleSheet/qdarkstyle/style.qrc
   )
@@ -1508,24 +1512,25 @@ endif (WIN32)
 # build a library for the QCustomPlot widget
 add_library (qcp STATIC ${qcp_CXXSRCS})
 target_include_directories (qcp PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/qcustomplot-source>)
-target_link_libraries (qcp Qt5::Widgets Qt5::PrintSupport)
+target_link_libraries (qcp Qt6::Widgets Qt6::PrintSupport)
+target_compile_options (qcp PRIVATE -Wno-error=misleading-indentation)
 
 # build a library of package Qt functionality
 add_library (wsjt_qt STATIC ${wsjt_qt_CXXSRCS} ${wsjt_qt_GENUISRCS} ${GENAXSRCS})
 # set wsjtx_udp exports to static variants
 target_compile_definitions (wsjt_qt PUBLIC UDP_STATIC_DEFINE)
-target_link_libraries (wsjt_qt Hamlib::Hamlib Boost::log qcp Qt5::Widgets Qt5::Network Qt5::Sql Qt5::WebSockets)
+target_link_libraries (wsjt_qt Hamlib::Hamlib Boost::log qcp Qt6::Widgets Qt6::Network Qt6::Sql Qt6::WebSockets)
 if (WIN32)
-  target_link_libraries (wsjt_qt Qt5::AxContainer Qt5::AxBase)
+  target_link_libraries (wsjt_qt Qt6::AxContainer Qt6::AxServer)
 endif (WIN32)
 
 # build a library of package Qt functionality used in Fortran utilities
 add_library (fort_qt STATIC ${fort_qt_CXXSRCS})
-target_link_libraries (fort_qt Qt5::Core)
+target_link_libraries (fort_qt Qt6::Core)
 
 # build a library of WSJT Qt multimedia components
 add_library (wsjt_qtmm STATIC ${wsjt_qtmm_CXXSRCS} ${wsjt_qtmm_GENUISRCS})
-target_link_libraries (wsjt_qtmm Qt5::Multimedia)
+target_link_libraries (wsjt_qtmm Qt6::Multimedia)
 
 # build the jt9 slow mode decoder driver
 generate_version_info (jt9_VERSION_RESOURCES
@@ -1535,7 +1540,7 @@ generate_version_info (jt9_VERSION_RESOURCES
   FILE_DESCRIPTION "jt9 - WSJT-X slow mode decoder"
   )
 
-add_executable (record_time_signal Audio/tools/record_time_signal.cpp)
+add_executable (record_time_signal EXCLUDE_FROM_ALL Audio/tools/record_time_signal.cpp)
 target_link_libraries (record_time_signal wsjt_cxx wsjt_qtmm wsjt_qt)
 
 add_executable (jt9 ${jt9_FSRCS} ${jt9_VERSION_RESOURCES})
@@ -1634,7 +1639,7 @@ else ()
       )
   endif ()
 endif ()
-target_link_libraries (wsjtx Qt5::SerialPort wsjt_cxx wsjt_qt wsjt_qtmm ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
+target_link_libraries (wsjtx Qt6::SerialPort wsjt_cxx wsjt_qt wsjt_qtmm ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES} wsjtx_udp-static)
 
 # make a library for WSJT-X UDP servers
 # add_library (wsjtx_udp SHARED ${UDP_library_CXXSRCS})
@@ -1654,7 +1659,7 @@ set_target_properties (wsjtx_udp-static PROPERTIES
   OUTPUT_NAME wsjtx_udp
   )
 target_compile_definitions (wsjtx_udp-static PUBLIC UDP_STATIC_DEFINE)
-target_link_libraries (wsjtx_udp-static Qt5::Network Qt5::Gui)
+target_link_libraries (wsjtx_udp-static Qt6::Network Qt6::Gui)
 generate_export_header (wsjtx_udp-static BASE_NAME udp)
 
 generate_version_info (udp_daemon_VERSION_RESOURCES
@@ -1683,7 +1688,7 @@ generate_version_info (message_aggregator_VERSION_RESOURCES
   )
 add_resources (message_aggregator_RESOURCES /qss ${message_aggregator_STYLESHEETS})
 configure_file (UDPExamples/message_aggregator.qrc.in message_aggregator.qrc @ONLY)
-qt5_add_resources (message_aggregator_RESOURCES_RCC
+qt6_add_resources (message_aggregator_RESOURCES_RCC
   ${CMAKE_CURRENT_BINARY_DIR}/message_aggregator.qrc
   contrib/QDarkStyleSheet/qdarkstyle/style.qrc
   )
@@ -1692,7 +1697,7 @@ add_executable (message_aggregator
   ${message_aggregator_RESOURCES_RCC}
   ${message_aggregator_VERSION_RESOURCES}
   )
-target_link_libraries (message_aggregator wsjt_qt Qt5::Widgets)
+target_link_libraries (message_aggregator wsjt_qt Qt6::Widgets wsjtx_udp-static)
 
 if (WSJT_CREATE_WINMAIN)
   set_target_properties (message_aggregator PROPERTIES WIN32_EXECUTABLE ON)

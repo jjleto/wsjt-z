@@ -1,3 +1,4 @@
+#include <limits>
 #ifndef AUDIODEVICE_HPP__
 #define AUDIODEVICE_HPP__
 
@@ -27,6 +28,7 @@ public:
   bool initialize (OpenMode mode, Channel channel);
 
   bool isSequential () const override {return true;}
+  qint64 bytesAvailable () const override {return std::numeric_limits<qint64>::max ();}
 
   size_t bytesPerFrame () const {return sizeof (qint16) * (Mono == m_channel ? 1 : 2);}
 

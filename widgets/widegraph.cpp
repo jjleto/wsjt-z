@@ -1,3 +1,4 @@
+#include <QFile>
 #include "widegraph.h"
 
 #include <algorithm>
@@ -411,12 +412,13 @@ void WideGraph::readPalette ()                                   //readPalette
   catch (std::exception const& e)
     {
       MessageBox::warning_message (this, tr ("Read Palette"), e.what ());
+      ui->widePlot->setColours (WFPalette {WFPalette::Colours {}}.interpolate ()); // fallback: nero->bianco
     }
 }
 
-void WideGraph::on_paletteComboBox_activated (QString const& palette)    //palette selector
+void WideGraph::on_paletteComboBox_activated (int index)    //palette selector
 {
-  m_waterfallPalette = palette;
+  m_waterfallPalette = ui->paletteComboBox->itemText (index);
   readPalette();
   replot();
 }
@@ -476,6 +478,7 @@ void WideGraph::on_adjust_palette_push_button_clicked (bool)   //Adjust Palette
   catch (std::exception const& e)
     {
       MessageBox::warning_message (this, tr ("Read Palette"), e.what ());
+      ui->widePlot->setColours (WFPalette {WFPalette::Colours {}}.interpolate ()); // fallback: nero->bianco
     }
 }
 

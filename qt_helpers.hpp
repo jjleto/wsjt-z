@@ -167,6 +167,5 @@ bool is_MAC_ambiguous_multicast_address (QHostAddress const& host_addr)
 }
 
 // Register some useful Qt types with QMetaType
-Q_DECLARE_METATYPE (QHostAddress);
 
 #endif

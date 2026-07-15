@@ -17,6 +17,7 @@ QString font_as_stylesheet (QFont const& font)
     case QFont::DemiBold: font_weight = "demibold"; break;
     case QFont::Bold: font_weight = "bold"; break;
     case QFont::Black: font_weight = "black"; break;
+    default: font_weight = "normal"; break;
     }
   return QString {
       " font-family: %1;\n"

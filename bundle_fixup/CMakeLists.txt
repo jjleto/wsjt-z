@@ -1,4 +1,4 @@
-get_target_property (QtCore_location Qt5::Core LOCATION)
+get_target_property (QtCore_location Qt6::Core LOCATION)
 get_filename_component (QtCore_location ${QtCore_location} PATH)
 list (APPEND fixup_library_dirs ${QtCore_location})
 
@@ -76,31 +76,33 @@ if (APPLE OR WIN32)
       list (APPEND fixup_library_dirs ${gcc_s_lib_dir})
     endif ()
 
-    # install required Qt plugins
-    install (
-      DIRECTORY
-      ${QT_PLUGINS_DIR}/platforms
-      ${QT_PLUGINS_DIR}/audio
-      ${QT_PLUGINS_DIR}/accessible
-      ${QT_PLUGINS_DIR}/imageformats
-      ${QT_PLUGINS_DIR}/styles
-      DESTINATION ${WSJT_PLUGIN_DESTINATION}
+    # install required Qt plugins (usa file(COPY ... FOLLOW_SYMLINK_CHAIN)
+    # invece di install(DIRECTORY/FILES) perche' i plugin di Homebrew sono
+    # symlink relativi che install() copia cosi' come sono, risultando in
+    # link rotti una volta spostati dentro il bundle)
+    install (CODE "
+      file (COPY
+        \"${QT_PLUGINS_DIR}/platforms\"
+        \"${QT_PLUGINS_DIR}/audio\"
+        \"${QT_PLUGINS_DIR}/accessible\"
+        \"${QT_PLUGINS_DIR}/imageformats\"
+        \"${QT_PLUGINS_DIR}/styles\"
+        DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${WSJT_PLUGIN_DESTINATION}\"
+        FOLLOW_SYMLINK_CHAIN
+        FILES_MATCHING PATTERN \"*${CMAKE_SHARED_LIBRARY_SUFFIX}\"
+        PATTERN \"*minimal*${CMAKE_SHARED_LIBRARY_SUFFIX}\" EXCLUDE
+        PATTERN \"*offscreen*${CMAKE_SHARED_LIBRARY_SUFFIX}\" EXCLUDE
+        PATTERN \"*quick*${CMAKE_SHARED_LIBRARY_SUFFIX}\" EXCLUDE
+        PATTERN \"*webgl*${CMAKE_SHARED_LIBRARY_SUFFIX}\" EXCLUDE
+        PATTERN \"*_debug${CMAKE_SHARED_LIBRARY_SUFFIX}\" EXCLUDE
+        PATTERN \"*${CMAKE_SHARED_LIBRARY_SUFFIX}.dSYM\" EXCLUDE
+        )
+      file (COPY
+        \"${QT_PLUGINS_DIR}/sqldrivers/libqsqlite${CMAKE_SHARED_LIBRARY_SUFFIX}\"
+        DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${WSJT_PLUGIN_DESTINATION}/sqldrivers\"
+        FOLLOW_SYMLINK_CHAIN
+        )"
       CONFIGURATIONS Release MinSizeRel RelWithDebInfo
-      #COMPONENT runtime
-      FILES_MATCHING PATTERN "*${CMAKE_SHARED_LIBRARY_SUFFIX}"
-      PATTERN "*minimal*${CMAKE_SHARED_LIBRARY_SUFFIX}" EXCLUDE
-      PATTERN "*offscreen*${CMAKE_SHARED_LIBRARY_SUFFIX}" EXCLUDE
-      PATTERN "*quick*${CMAKE_SHARED_LIBRARY_SUFFIX}" EXCLUDE
-      PATTERN "*webgl*${CMAKE_SHARED_LIBRARY_SUFFIX}" EXCLUDE
-      PATTERN "*_debug${CMAKE_SHARED_LIBRARY_SUFFIX}" EXCLUDE
-      PATTERN "*${CMAKE_SHARED_LIBRARY_SUFFIX}.dSYM" EXCLUDE
-      )
-    install (
-      FILES
-      ${QT_PLUGINS_DIR}/sqldrivers/libqsqlite${CMAKE_SHARED_LIBRARY_SUFFIX}
-      DESTINATION ${WSJT_PLUGIN_DESTINATION}/sqldrivers
-      CONFIGURATIONS Release MinSizeRel RelWithDebInfo
-      #COMPONENT runtime
       )
     # install (
     # 	DIRECTORY

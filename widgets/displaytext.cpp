@@ -307,7 +307,7 @@ QString DisplayText::appendWorkedB4 (QString message, QString call, QString cons
     call=call.mid(0,i0);
   }
   if(call.length()<3) return message;
-  if(!call.contains(QRegExp("[0-9]|[A-Z]"))) return message;
+  if(!call.contains(QRegularExpression("[0-9]|[A-Z]"))) return message;
 
   auto const& looked_up = logBook.countries ()->lookup (call);
   logBook.match (call, currentMode, grid, looked_up, callB4, countryB4, gridB4, continentB4, CQZoneB4, ITUZoneB4);
@@ -446,7 +446,7 @@ QString DisplayText::leftJustifyAppendage (QString message, QString const& appen
       // use a nbsp to save the start of appended text so we can find
       // it again later, align appended data at a fixed column if
       // there is space otherwise let it float to the right
-      int space_count {m_config->padding() + padding - message.size ()};
+      int space_count {m_config->padding() + padding - int (message.size ())};
       if (space_count > 0) {
         message += QString {space_count, QChar {' '}};
       }
@@ -868,7 +868,7 @@ void DisplayText::flushUpdates() {
     m_updateBuffer.clear();
 }
 
-void DisplayText::enterEvent(QEvent *event) {
+void DisplayText::enterEvent(QEnterEvent *event) {
     if (m_config && m_config->freezeBA() && isBandActivity) {
         m_freezeUpdates = true;
         setStyleSheet("QTextEdit { border: 2px solid red; }"

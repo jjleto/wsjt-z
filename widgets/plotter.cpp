@@ -209,7 +209,7 @@ void CPlotter::draw(float swide[], bool bScroll, bool bRed)
     int y1 = 10.0*gain*y + m_plotZero;
     if (y1<0) y1=0;
     if (y1>254) y1=254;
-    if (swide[i]<1.e29) painter1.setPen(g_ColorTbl[y1]);
+    if (swide[i]<1.e29 && y1 < g_ColorTbl.size ()) painter1.setPen(g_ColorTbl[y1]);
     painter1.drawPoint(i,m_j);
   }
   m_line++;

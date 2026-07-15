@@ -9,7 +9,7 @@ USStateDB::USStateDB()
 {
     auto const file_name = "USState.db";
     QString path;
-    QDir dataPath {QStandardPaths::writableLocation (QStandardPaths::DataLocation)};
+    QDir dataPath {QStandardPaths::writableLocation (QStandardPaths::AppLocalDataLocation)};
     path = dataPath.absoluteFilePath (file_name)
 
     db = QSqlDatabase::addDatabase("QSQLITE");

@@ -35,3 +35,17 @@ CLAUDE.md
 CLAUDE.local.md
 .anthropic/
 .aider*
+
+# Build artifacts
+/build/
+/stage/
+
+# File di backup creati durante il porting Qt6
+*.bak-qt5
+*.bak-debug
+*.bak-conflict
+*.bak-manual
+*.bak-v2
+
+# Log di build
+*.log

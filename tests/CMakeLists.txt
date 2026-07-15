@@ -1,9 +1,9 @@
-find_package (Qt5Test 5 REQUIRED)
+find_package (Qt6Test 6 REQUIRED)
 
 #
 # Compiler options
 #
-set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_CXX_STANDARD 17)
 add_compile_options ("$<$<COMPILE_LANGUAGE:Fortran>:-Wall;-Wno-conversion;-fno-second-underscore;-fno-f2c>")
 add_compile_options ("$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:Debug>>:-fbounds-check>")
 add_compile_options ("$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<NOT:$<CONFIG:Debug>>>:-funroll-all-loops>")
@@ -19,5 +19,5 @@ set (CMAKE_AUTOMOC ON)
 include_directories (${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR})
 
 add_executable (test_qt_helpers test_qt_helpers.cpp)
-target_link_libraries (test_qt_helpers wsjt_qt Qt5::Test)
+target_link_libraries (test_qt_helpers wsjt_qt Qt6::Test)
 add_test (test_qt_helpers test_qt_helpers)

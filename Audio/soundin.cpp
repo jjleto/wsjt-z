@@ -3,9 +3,9 @@
 #include <cstdlib>
 #include <cmath>
 #include <iomanip>
-#include <QAudioDeviceInfo>
+#include <QAudioDevice>
 #include <QAudioFormat>
-#include <QAudioInput>
+#include <QAudioSource>
 #include <QSysInfo>
 #include <QDebug>
 
@@ -46,7 +46,7 @@ bool SoundInput::checkStream ()
   return result;
 }
 
-void SoundInput::start(QAudioDeviceInfo const& device, int framesPerBuffer, AudioDevice * sink
+void SoundInput::start(QAudioDevice const& device, int framesPerBuffer, AudioDevice * sink
                        , unsigned downSampleFactor, AudioDevice::Channel channel)
 {
   Q_ASSERT (sink);
@@ -58,11 +58,8 @@ void SoundInput::start(QAudioDeviceInfo const& device, int framesPerBuffer, Audi
   QAudioFormat format (device.preferredFormat());
 //  qDebug () << "Preferred audio input format:" << format;
   format.setChannelCount (AudioDevice::Mono == channel ? 1 : 2);
-  format.setCodec ("audio/pcm");
   format.setSampleRate (12000 * downSampleFactor);
-  format.setSampleType (QAudioFormat::SignedInt);
-  format.setSampleSize (16);
-  format.setByteOrder (QAudioFormat::Endian (QSysInfo::ByteOrder));
+  format.setSampleFormat (QAudioFormat::Int16);
   if (!format.isValid ())
     {
       Q_EMIT error (tr ("Requested input audio format is not valid."));
@@ -76,14 +73,13 @@ void SoundInput::start(QAudioDeviceInfo const& device, int framesPerBuffer, Audi
     }
   // qDebug () << "Selected audio input format:" << format;
 
-  m_stream.reset (new QAudioInput {device, format});
+  m_stream.reset (new QAudioSource {device, format});
   if (!checkStream ())
     {
       return;
     }
 
-  connect (m_stream.data(), &QAudioInput::stateChanged, this, &SoundInput::handleStateChanged);
-  connect (m_stream.data(), &QAudioInput::notify, [this] () {checkStream ();});
+  connect (m_stream.data(), &QAudioSource::stateChanged, this, &SoundInput::handleStateChanged);
 
   //qDebug () << "SoundIn default buffer size (bytes):" << m_stream->bufferSize () << "period size:" << m_stream->periodSize ();
   // the Windows MME version of QAudioInput uses 1/5 of the buffer
@@ -146,7 +142,7 @@ void SoundInput::handleStateChanged (QAudio::State newState)
       Q_EMIT status (tr ("Suspended"));
       break;
 
-#if QT_VERSION >= QT_VERSION_CHECK (5, 10, 0)
+#if QT_VERSION >= QT_VERSION_CHECK (5, 10, 0) && QT_VERSION < QT_VERSION_CHECK (6, 0, 0)
     case QAudio::InterruptedState:
       Q_EMIT status (tr ("Interrupted"));
       break;

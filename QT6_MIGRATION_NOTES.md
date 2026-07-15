@@ -1,17 +1,17 @@
-# Diario di migrazione Qt6 — wsjt-z (fork SpudGunMan/wsjt-z, branch spud)
+# Qt6 Migration Notes — wsjt-z (SpudGunMan/wsjt-z fork, spud branch)
 
-Riferimento completo delle modifiche necessarie per portare wsjt-z da Qt5 a Qt6 su macOS (Apple Silicon, Homebrew). Utile sia come documentazione sia come checklist se il porting va ripetuto su un fork/branch diverso.
+Complete reference of the changes needed to port wsjt-z from Qt5 to Qt6 on macOS (Apple Silicon, Homebrew). Useful both as documentation and as a checklist if the port needs to be repeated on a different fork/branch.
 
 ---
 
-## 0. Prerequisiti di sistema
+## 0. System prerequisites
 
 ```bash
 brew install qtbase qtserialport qtmultimedia qtwebsockets qttools
-brew install asciidoc          # per le man page (o usa -DWSJT_SKIP_MANPAGES=ON)
+brew install asciidoc          # for man pages (or use -DWSJT_SKIP_MANPAGES=ON)
 ```
 
-**Hamlib**: serve una versione recente (usata: **4.7.1/4.7.2**) compilata da sorgente — la versione stabile di Homebrew è troppo vecchia e non ha l'API ABI-stable richiesta dal codice (`rig_get_caps_int`, `rig_get_caps_cptr`, `rig_list_foreach_model`, ecc.).
+**Hamlib**: a recent version is required (used here: **4.7.1/4.7.2**), built from source — Homebrew's stable release is too old and lacks the ABI-stable API the code requires (`rig_get_caps_int`, `rig_get_caps_cptr`, `rig_list_foreach_model`, etc.).
 
 ```bash
 git clone https://github.com/Hamlib/Hamlib.git
@@ -19,57 +19,57 @@ cd Hamlib && ./bootstrap && ./configure --prefix=/opt/homebrew/opt/hamlib-471
 make -j$(sysctl -n hw.ncpu) && sudo make install
 ```
 
-**QCustomPlot**: la copia embedded nel repo (`qcustomplot-source/`) va aggiornata a **2.1.1+** (supporto Qt6 ufficiale). Copiare `qcustomplot.h`/`.cpp` da una release 2.1.1 o da un fork Qt6-ready (es. wsjt-x_improved) sopra i file esistenti.
+**QCustomPlot**: the embedded copy in the repo (`qcustomplot-source/`) needs to be updated to **2.1.1+** (official Qt6 support). Copy `qcustomplot.h`/`.cpp` from a 2.1.1 release, or from a Qt6-ready fork (e.g. wsjt-x_improved), over the existing files.
 
 ---
 
-## 1. CMakeLists.txt principale
+## 1. Main CMakeLists.txt
 
-| Cosa | Prima (Qt5) | Dopo (Qt6) |
+| What | Before (Qt5) | After (Qt6) |
 |---|---|---|
 | find_package | `find_package (Qt5 COMPONENTS ...)` | `find_package (Qt6 COMPONENTS ...)` |
 | AxContainer (Win) | `find_package (Qt5AxContainer REQUIRED)` | `find_package (Qt6 REQUIRED COMPONENTS AxContainer AxServer)` |
-| Standard C++ | (nessuno, default vecchio) | aggiungere `set (CMAKE_CXX_STANDARD 17)` + `set (CMAKE_CXX_STANDARD_REQUIRED ON)` |
+| C++ standard | (none, old default) | add `set (CMAKE_CXX_STANDARD 17)` + `set (CMAKE_CXX_STANDARD_REQUIRED ON)` |
 | qmake/lconvert | `Qt5::qmake`, `Qt5::lconvert` | `Qt6::qmake`, `Qt6::lconvert` |
-| target_link_libraries | ogni `Qt5::Xxx` | `Qt6::Xxx` (sed globale) |
-| AxBase (Win) | `Qt5::AxBase` | `Qt6::AxServer` (non è un semplice rename!) |
-| Comandi traduzione | `qt5_add_translation`, `qt5_create_translation` | `qt6_add_translation`, `qt6_create_translation` |
-| UI/risorse | `qt5_wrap_ui`, `qt5_add_resources` | `qt6_wrap_ui`, `qt6_add_resources` |
-| Deprecazioni | `-Werror` blocca tutto | aggiungere `add_compile_options ($<$<COMPILE_LANGUAGE:CXX>:-Wno-error=deprecated-declarations>)` — **risparmia decine di fix singoli** |
-| MinGW (opzionale) | — | `if(MINGW) add_compile_options(...-Wa,-mbig-obj) add_link_options(-Wa,-mbig-obj) endif()` |
+| target_link_libraries | every `Qt5::Xxx` | `Qt6::Xxx` (global sed) |
+| AxBase (Win) | `Qt5::AxBase` | `Qt6::AxServer` (not a simple rename!) |
+| Translation commands | `qt5_add_translation`, `qt5_create_translation` | `qt6_add_translation`, `qt6_create_translation` |
+| UI/resources | `qt5_wrap_ui`, `qt5_add_resources` | `qt6_wrap_ui`, `qt6_add_resources` |
+| Deprecations | `-Werror` blocks everything | add `add_compile_options ($<$<COMPILE_LANGUAGE:CXX>:-Wno-error=deprecated-declarations>)` — **saves dozens of individual fixes** |
+| MinGW (optional) | — | `if(MINGW) add_compile_options(...-Wa,-mbig-obj) add_link_options(-Wa,-mbig-obj) endif()` |
 
-File satellite con lo stesso pattern `Qt5::`/`qt5_*` da sistemare: `tests/CMakeLists.txt`, `qmap/CMakeLists.txt`, `qmap/libqmap/CMakeLists.txt`, `bundle_fixup/CMakeLists.txt`, `map65/CMakeLists.txt`, `map65/libm65/CMakeLists.txt`.
+Satellite files with the same `Qt5::`/`qt5_*` pattern to fix: `tests/CMakeLists.txt`, `qmap/CMakeLists.txt`, `qmap/libqmap/CMakeLists.txt`, `bundle_fixup/CMakeLists.txt`, `map65/CMakeLists.txt`, `map65/libm65/CMakeLists.txt`.
 
 ---
 
-## 2. Errori di compilazione C++ — catalogo per categoria
+## 2. C++ compilation errors — catalog by category
 
 ### QRegExp → QRegularExpression
-Rimossa completamente in Qt6. Da sostituire ovunque, con attenzione a:
+Completely removed in Qt6. Needs replacing everywhere, watch out for:
 - `QRegExpValidator` → `QRegularExpressionValidator`
-- Se la classe **eredita** da `QRegExpValidator`, va cambiata anche la base class, non solo l'include
-- `QStringList::indexOf(QRegExp, from)` / `lastIndexOf` non hanno equivalente diretto con `QRegularExpression` → riscrivere con ciclo esplicito e `re.match(x).hasMatch()`
+- If a class **inherits** from `QRegExpValidator`, the base class needs changing too, not just the include
+- `QStringList::indexOf(QRegExp, from)` / `lastIndexOf` have no direct equivalent with `QRegularExpression` → rewrite with an explicit loop and `re.match(x).hasMatch()`
 
-File coinvolti in questo porting: `Radio.cpp`, `widgets/mainwindow.cpp`, `widgets/displaytext.cpp`, `Network/wsprnet.cpp`, `UDPExamples/ClientWidget.cpp`, `Transceiver/HRDTransceiver.cpp/.hpp`, `validators/LiveFrequencyValidator.hpp/.cpp`, `GetUserId.cpp`, `item_delegates/MessageItemDelegate.cpp`.
+Files involved in this port: `Radio.cpp`, `widgets/mainwindow.cpp`, `widgets/displaytext.cpp`, `Network/wsprnet.cpp`, `UDPExamples/ClientWidget.cpp`, `Transceiver/HRDTransceiver.cpp/.hpp`, `validators/LiveFrequencyValidator.hpp/.cpp`, `GetUserId.cpp`, `item_delegates/MessageItemDelegate.cpp`.
 
-### qRegisterMetaTypeStreamOperators — rimossa in Qt6
-Qt6 rileva automaticamente gli stream operator custom (nessuna registrazione esplicita necessaria) — **ma solo se il tipo ha davvero un `operator<<`/`operator>>` scritto a mano**. Per i tipi struct complessi (liste di frequenze, stazioni, palette colori) probabilmente non serve fare altro. Per gli **enum semplici** (senza operator custom), la registrazione andava a un meccanismo generico che in Qt6 non esiste più: la soluzione robusta è **salvare/leggere da QSettings come `int` esplicito** (`static_cast<int>(...)` / `.toInt()`), non affidarsi a `QVariant::fromValue`/`.value<T>()`.
+### qRegisterMetaTypeStreamOperators — removed in Qt6
+Qt6 automatically detects custom stream operators (no explicit registration needed) — **but only if the type actually has a hand-written `operator<<`/`operator>>`**. For complex struct types (frequency lists, station lists, color palettes) nothing else is likely needed. For **plain enums** (with no custom operator), registration used to hook into a generic mechanism that no longer exists in Qt6: the robust fix is to **save/read from QSettings as an explicit `int`** (`static_cast<int>(...)` / `.toInt()`), rather than relying on `QVariant::fromValue`/`.value<T>()`.
 
-⚠️ **Bug runtime scoperto**: se un enum come questo viene letto "sporco" da preferenze salvate con la vecchia serializzazione, `QButtonGroup::button(id)` può restituire `nullptr` → crash su `setChecked()`. Fix difensivo raccomandato ovunque: `if (auto * btn = group->button(id)) btn->setChecked(true);` invece di incatenare `->setChecked()` senza controllo.
+⚠️ **Runtime bug discovered**: if such an enum is read back "dirty" from preferences saved with the old serialization, `QButtonGroup::button(id)` can return `nullptr` → crash on `setChecked()`. Recommended defensive fix everywhere: `if (auto * btn = group->button(id)) btn->setChecked(true);` instead of chaining `->setChecked()` without a check.
 
-### QAudioFormat (setup manuale, ricorre in più file)
+### QAudioFormat (manual setup, recurring in several files)
 ```cpp
 // Qt5
-format.setCodec ("audio/pcm");           // RIMUOVERE (PCM implicito)
+format.setCodec ("audio/pcm");           // REMOVE (PCM is now implicit)
 format.setSampleType (QAudioFormat::SignedInt);
 format.setSampleSize (16);
-format.setByteOrder (QAudioFormat::Endian (QSysInfo::ByteOrder));  // RIMUOVERE (native-endian implicito)
+format.setByteOrder (QAudioFormat::Endian (QSysInfo::ByteOrder));  // REMOVE (native-endian is now implicit)
 // Qt6
-format.setSampleFormat (QAudioFormat::Int16);   // sostituisce le due righe sopra
+format.setSampleFormat (QAudioFormat::Int16);   // replaces the two lines above
 ```
-Se serve tracciare il byte-order originale (es. per file WAV/BWF con dati non-nativi), aggiungere un membro custom (es. `bool big_endian_`) perché `QAudioFormat` non lo espone più.
+If you need to track the original byte order (e.g. for WAV/BWF files with non-native data), add a custom member (e.g. `bool big_endian_`) since `QAudioFormat` no longer exposes it.
 
-### QtMultimedia — rinominazioni di classi
+### QtMultimedia — class renames
 | Qt5 | Qt6 |
 |---|---|
 | `QAudioDeviceInfo` | `QAudioDevice` |
@@ -78,71 +78,71 @@ Se serve tracciare il byte-order originale (es. per file WAV/BWF con dati non-na
 | `QAudioDeviceInfo::availableDevices(QAudio::Mode)` | `QMediaDevices::audioInputs()` / `audioOutputs()` |
 | `device.deviceName()` | `device.description()` |
 | `QAudio::Mode`, `QAudio::AudioInput/Output` | `QAudioDevice::Mode`, `QAudioDevice::Input/Output` |
-| `device.supportedChannelCounts()` | rimosso — usare una lista fissa `{1,2}` se l'app usa solo mono/stereo |
+| `device.supportedChannelCounts()` | removed — use a fixed list `{1,2}` if the app only uses mono/stereo |
 
-API rimosse senza sostituto diretto (semplicemente eliminare le chiamate): `setNotifyInterval()`, segnale `notify()`, `setCategory()` (specifico PulseAudio/Linux), `QAudio::InterruptedState` (va tolto dall'enum o va ristretto il blocco `#if QT_VERSION ... < QT_VERSION_CHECK(6,0,0)`).
+APIs removed with no direct replacement (simply delete the calls): `setNotifyInterval()`, the `notify()` signal, `setCategory()` (PulseAudio/Linux-specific), `QAudio::InterruptedState` (either remove it from the enum handling or narrow the `#if QT_VERSION ... < QT_VERSION_CHECK(6,0,0)` block).
 
-⚠️ **Bug runtime sottile — QIODevice sequenziale in modalità push**: se una classe (es. un generatore di toni tipo `Modulator`) sovrascrive `isSequential() → true` ma **non sovrascrive `bytesAvailable()`**, in Qt6 `QAudioSink::start(QIODevice*)` può decidere di non chiamare mai `readData()` (perché il default di `bytesAvailable()` è 0) e fermarsi silenziosamente, senza errore. Fix:
+⚠️ **Subtle runtime bug — sequential QIODevice in push mode**: if a class (e.g. a tone-generator like `Modulator`) overrides `isSequential() → true` but **does not override `bytesAvailable()`**, in Qt6 `QAudioSink::start(QIODevice*)` may decide never to call `readData()` (because the default `bytesAvailable()` is 0) and silently stop, with no error. Fix:
 ```cpp
 qint64 bytesAvailable () const override {return std::numeric_limits<qint64>::max ();}
 ```
 
-### Qt::AlignXxx + Qt::AlignYyy → operatore `|`
-L'operatore `+` tra flag è stato **eliminato di proposito** in Qt6 (era un uso improprio). Sostituire con `|`. Se il risultato va assegnato a un `QVariant` (tipico in `data()` di modelli item), serve anche un cast esplicito:
+### Qt::AlignXxx + Qt::AlignYyy → `|` operator
+The `+` operator between flags was **deliberately removed** in Qt6 (it was a misuse). Replace with `|`. If the result is assigned to a `QVariant` (typical in item model `data()`), an explicit cast is also needed:
 ```cpp
-item = int (Qt::AlignHCenter | Qt::AlignVCenter);   // non solo "|", anche il cast
+item = int (Qt::AlignHCenter | Qt::AlignVCenter);   // not just "|", also the cast
 ```
 
 ### Narrowing qsizetype → int
-`QString::size()`/`count()` restituiscono `qsizetype` (64-bit) in Qt6. Negli initializer-list con parentesi graffe (`int x {expr};`), il narrowing implicito è un errore. Aggiungere `int (...)` esplicito attorno all'espressione.
+`QString::size()`/`count()` return `qsizetype` (64-bit) in Qt6. In brace-initializer lists (`int x {expr};`), the implicit narrowing is an error. Add an explicit `int (...)` cast around the expression.
 
-### Altre deprecazioni/rimozioni puntuali incontrate
+### Other point deprecations/removals encountered
 - `QDateTime::fromTime_t()` → `fromSecsSinceEpoch()`
 - `QLocale::countryToString()`/`.country()` → `territoryToString()`/`.territory()`
-- `QSortFilterProxyModel::invalidateFilter()` → deprecato (Qt 6.13+), lasciato passare con il flag `-Wno-error=deprecated-declarations` globale
+- `QSortFilterProxyModel::invalidateFilter()` → deprecated (Qt 6.13+), left as-is via the global `-Wno-error=deprecated-declarations` flag
 - `QStandardPaths::DataLocation` → `AppLocalDataLocation`
 - `Qt::ItemIsTristate` → `Qt::ItemIsAutoTristate`
 - `QFormLayout::setMargin(n)` → `setContentsMargins(n,n,n,n)`
 - `QNetworkRequest::FollowRedirectsAttribute` → `setAttribute(RedirectPolicyAttribute, NoLessSafeRedirectPolicy)`
-- `enterEvent(QEvent*)` → firma cambiata a `enterEvent(QEnterEvent*)`
-- `QFile::open()` ora `[[nodiscard]]` → avvolgere con `(void)` se il valore di ritorno non serve
-- `std::random_shuffle` (rimosso da C++17) → `std::shuffle(..., std::mt19937{std::random_device{}()})`
-- Switch su `QFont::Weight` non esaustivo (Qt6 ha aggiunto Thin/ExtraLight/Medium/...) → aggiungere `default:`
-- `QAbstractItemModel`/enum salvati come `QVariant` con operator+ → stessa storia di Qt::Align sopra
+- `enterEvent(QEvent*)` → signature changed to `enterEvent(QEnterEvent*)`
+- `QFile::open()` is now `[[nodiscard]]` → wrap with `(void)` if the return value isn't used
+- `std::random_shuffle` (removed in C++17) → `std::shuffle(..., std::mt19937{std::random_device{}()})`
+- Non-exhaustive switch on `QFont::Weight` (Qt6 added Thin/ExtraLight/Medium/...) → add a `default:` case
+- `QAbstractItemModel`/enums saved as `QVariant` with `operator+` → same story as Qt::Align above
 
 ---
 
-## 3. Bug runtime scoperti dopo la compilazione
+## 3. Runtime bugs discovered after compilation succeeded
 
-1. **Crash all'avvio in `Configuration::impl::initialize_models()`** su `button(id)->setChecked()` — causato da un valore enum "sporco" letto da `QSettings` (vedi punto qRegisterMetaTypeStreamOperators sopra). Fix: cast a int in lettura/scrittura + guardia `if (auto* btn = ...)`.
+1. **Startup crash in `Configuration::impl::initialize_models()`** on `button(id)->setChecked()` — caused by a "dirty" enum value read from `QSettings` (see the qRegisterMetaTypeStreamOperators note above). Fix: cast to int on read/write + guard with `if (auto* btn = ...)`.
 
-2. **Crash in `CPlotter::draw()`** su `g_ColorTbl[y1]` — la palette colori (`WFPalette`) può fallire silenziosamente nel caricamento (il blocco `catch` mostrava solo un warning ma non impostava un fallback), lasciando `g_ColorTbl` vuota. Fix doppio: (a) fallback esplicito nel `catch` di `WideGraph::readPalette()`, (b) guardia `y1 < g_ColorTbl.size()` prima dell'accesso in `CPlotter::draw()`.
+2. **Crash in `CPlotter::draw()`** on `g_ColorTbl[y1]` — the color palette (`WFPalette`) can silently fail to load (the `catch` block only showed a warning but never set a fallback), leaving `g_ColorTbl` empty. Two-part fix: (a) an explicit fallback in `WideGraph::readPalette()`'s `catch` block, (b) a `y1 < g_ColorTbl.size()` guard before the access in `CPlotter::draw()`.
 
-3. **Nessun audio in trasmissione** — vedi il bug `bytesAvailable()` sopra. Diagnosticato con `fprintf(stderr, ...)` diretti (i normali `qDebug()` erano intercettati da un message handler custom basato su boost::log e non comparivano in console).
-
----
-
-## 4. Bundle macOS (.app) — fixup_bundle
-
-- **`CMAKE_BUILD_TYPE` deve essere esattamente `Release`** (case-sensitive!) — se è `RELEASE` (maiuscolo), le regole `install(... CONFIGURATIONS Release ...)` vengono saltate silenziosamente, e i plugin non vengono copiati nel bundle.
-- **I plugin Qt6 di Homebrew sono symlink relativi** (es. `libqgif.dylib -> ../../../../Cellar/qtbase/.../libqgif.dylib`). `install(DIRECTORY/FILES ...)` li copia "così come sono", risultando in link rotti una volta spostati dentro il bundle (percorso relativo non più valido). Fix: sostituire `install(DIRECTORY ...)` con `install(CODE "file(COPY ... FOLLOW_SYMLINK_CHAIN ...)")`, che risolve la catena di symlink copiando il file reale.
-- **`otool -l failed`** nell'errore di `fixup_bundle` è quasi sempre sintomo di questo problema di symlink rotti, non di plugin realmente mancanti.
+3. **No audio on transmit** — see the `bytesAvailable()` bug above. Diagnosed with direct `fprintf(stderr, ...)` calls (normal `qDebug()` output was being intercepted by a custom boost::log-based message handler and never showed up in the console).
 
 ---
 
-## 5. Metodo di lavoro consigliato per ripetere il porting
+## 4. macOS bundle (.app) — fixup_bundle
 
-1. Prima passata: `find_package`, target_link_libraries, standard C++17 → arrivare a un errore di compilazione.
-2. Aggiungere subito `-Wno-error=deprecated-declarations` per non perdere tempo su ogni singola deprecazione — occuparsi solo degli errori "duri" (API rimosse, non solo deprecate).
-3. Compilare iterativamente: un errore alla volta, category by category (spesso lo stesso errore si ripete identico in molti file — conviene fare `grep -rn` del pattern e sistemarli tutti insieme prima di ricompilare).
-4. Una volta compilato: testare a runtime con `lldb` per i crash, e log `fprintf(stderr,...)` mirati se `qDebug()` non è visibile (message handler custom).
-5. Solo alla fine: sistemare il bundle/packaging (`CMAKE_BUILD_TYPE`, symlink dei plugin).
+- **`CMAKE_BUILD_TYPE` must be exactly `Release`** (case-sensitive!) — if it's `RELEASE` (all caps), the `install(... CONFIGURATIONS Release ...)` rules are silently skipped, and plugins never get copied into the bundle.
+- **Homebrew's Qt6 plugins are relative symlinks** (e.g. `libqgif.dylib -> ../../../../Cellar/qtbase/.../libqgif.dylib`). `install(DIRECTORY/FILES ...)` copies them "as-is," which results in broken links once moved inside the bundle (the relative path no longer resolves). Fix: replace `install(DIRECTORY ...)` with `install(CODE "file(COPY ... FOLLOW_SYMLINK_CHAIN ...)")`, which resolves the symlink chain by copying the real file.
+- **`otool -l failed`** in the `fixup_bundle` error is almost always a symptom of this broken-symlink issue, not of genuinely missing plugins.
 
 ---
 
-## 6. Git — mettere in sicurezza il lavoro e gestire aggiornamenti upstream
+## 5. Recommended workflow for repeating this port
 
-**Appena finito il porting, committa subito** (`git add -A && git commit -m "..."`) — ma **prima** crea un `.gitignore` adeguato, altrimenti il commit si porta dietro l'intera cartella `build/` (centinaia di MB di artefatti CMake/moc), eventuali cartelle di bundle `stage/`, `.DS_Store`, e tutti i file `.bak-*` creati durante il debug:
+1. First pass: `find_package`, target_link_libraries, C++17 standard → get to a compilation error.
+2. Immediately add `-Wno-error=deprecated-declarations` to avoid wasting time on every single deprecation — deal only with the "hard" errors (removed APIs, not merely deprecated ones).
+3. Compile iteratively: one error at a time, category by category (the same error often repeats identically across many files — it's worth doing a `grep -rn` for the pattern and fixing them all together before recompiling).
+4. Once it compiles: test at runtime with `lldb` for crashes, and targeted `fprintf(stderr,...)` logging if `qDebug()` isn't visible (custom message handler).
+5. Only at the end: fix up the bundle/packaging (`CMAKE_BUILD_TYPE`, plugin symlinks).
+
+---
+
+## 6. Git — securing the work and handling upstream updates
+
+**As soon as the port is done, commit right away** (`git add -A && git commit -m "..."`) — but **first** create a proper `.gitignore`, otherwise the commit drags along the entire `build/` directory (hundreds of MB of CMake/moc artifacts), any `stage/` bundle folders, `.DS_Store`, and all the `.bak-*` files created during debugging:
 
 ```gitignore
 # Build artifacts
@@ -152,57 +152,57 @@ item = int (Qt::AlignHCenter | Qt::AlignVCenter);   // non solo "|", anche il ca
 # macOS
 .DS_Store
 
-# File di backup creati durante il porting Qt6
+# Backup files created during the Qt6 port
 *.bak-qt5
 *.bak-debug
 *.bak-conflict
 *.bak-manual
 *.bak-v2
 
-# Log di build
+# Build logs
 *.log
 ```
 
-Se te ne accorgi *dopo* aver già committato, ripulisci con un commit successivo (non serve riscrivere la history):
+If you notice this *after* already committing, clean it up with a follow-up commit (no need to rewrite history):
 ```bash
 git rm -r --cached build stage
 git rm --cached *.bak-* 2>/dev/null
 git add .gitignore
-git commit -m "Rimuovi artefatti di build dal repository"
+git commit -m "Remove build artifacts from the repository"
 ```
 
-**Quando il repository upstream (`sq9fve/wsjt-z`, branch `spud` via `SpudGunMan`) riceve nuovi commit:**
+**When the upstream repository (`sq9fve/wsjt-z`, `spud` branch via `SpudGunMan`) receives new commits:**
 
 ```bash
 git fetch origin
-git log HEAD..origin/spud --oneline   # vedi cosa arriva, prima di toccare nulla
+git log HEAD..origin/spud --oneline   # see what's coming in before touching anything
 git rebase origin/spud
 ```
 
-Se emergono conflitti, Git si ferma commit per commit. Procedura standard per ciascuno:
+If conflicts come up, Git stops commit by commit. Standard procedure for each one:
 ```bash
-grep -n "<<<<<<<\|=======\|>>>>>>>" <file-in-conflitto>
-# guarda il contesto, decidi (tieni HEAD/upstream, tieni il tuo, o unisci)
-# risolvi manualmente o con un piccolo script python che sostituisce il blocco esatto
-git add <file-risolto>
-git rebase --continue   # potrebbe aprire l'editor per il messaggio di commit: Esc, :wq, Invio
+grep -n "<<<<<<<\|=======\|>>>>>>>" <conflicting-file>
+# look at the context, decide (keep HEAD/upstream, keep yours, or merge both)
+# resolve manually or with a small python script that replaces the exact block
+git add <resolved-file>
+git rebase --continue   # may open an editor for the commit message: Esc, :wq, Enter
 ```
 
-Nel nostro caso i conflitti erano quasi sempre banali: numeri di versione (`VERSION_Z`) bumpati da vecchi commit locali (basta tenere il valore più recente/HEAD), o una feature UDP arricchita in parallelo sia da noi che da upstream (spesso si possono unire entrambe le versioni).
+In our case the conflicts were almost always trivial: version numbers (`VERSION_Z`) bumped by old local commits (just keep the newer/HEAD value), or a UDP feature enriched in parallel both by us and upstream (often both versions can be merged).
 
-⚠️ **Trappola scoperta sul campo: un `git rebase --continue` può "risolvere" un conflitto lasciando i marcatori `<<<<<<<`/`=======`/`>>>>>>>` scritti letteralmente nel file**, se il passaggio precedente non è stato ripulito del tutto prima del `git add`. Questo non dà errore al momento del commit — emerge solo dopo, come errore di parsing CMake o come dichiarazione duplicata in C++. **Dopo ogni rebase con conflitti, esegui sempre una scansione completa del repository**, non fidarti del solo file su cui hai lavorato:
+⚠️ **Trap discovered in the field: a `git rebase --continue` can "resolve" a conflict while leaving the `<<<<<<<`/`=======`/`>>>>>>>` markers literally written into the file**, if the previous step wasn't fully cleaned up before the `git add`. This doesn't produce an error at commit time — it only surfaces later, as a CMake parse error or a duplicate declaration in C++. **After every rebase involving conflicts, always run a full repository scan**, don't just trust the one file you were working on:
 ```bash
 grep -rn "<<<<<<<\|^=======$\|>>>>>>>" --include="*.cpp" --include="*.hpp" --include="*.h" --include="*.txt" . | grep -v build
 ```
 
-Dopo un rebase, **ricompila sempre da zero** (`rm -rf build`) e testa a runtime tutte le funzionalità principali (waterfall, decodifica, PTT, audio TX) — un rebase può reintrodurre silenziosamente codice Qt5 se un conflitto viene risolto scegliendo la versione sbagliata.
+After a rebase, **always rebuild from scratch** (`rm -rf build`) and test all the main functionality at runtime (waterfall, decoding, PTT, TX audio) — a rebase can silently reintroduce Qt5 code if a conflict gets resolved by picking the wrong version.
 
 ---
 
-## 7. Bug aggiuntivi scoperti dopo il rebase (non presenti nel porting originale)
+## 7. Additional bugs discovered after the rebase (not present in the original port)
 
-### `QComboBox::activated(const QString&)` rimosso in Qt6
-Qt5 aveva due overload del segnale `activated`: `activated(int)` e `activated(const QString&)`. Il meccanismo di **auto-connessione per nome** di Qt (`on_<oggetto>_<segnale>`, senza bisogno di `connect()` esplicito) si affidava all'overload `QString` per gli slot con quella firma. **Qt6 ha rimosso l'overload `QString`** — resta solo `activated(int index)`. Se uno slot `on_xxxComboBox_activated(QString const&)` esisteva nel codice Qt5, l'auto-connessione ora fallisce **silenziosamente** (nessun errore di compilazione, solo un warning runtime spesso filtrato da logger custom) e il combo box smette di funzionare.
+### `QComboBox::activated(const QString&)` removed in Qt6
+Qt5 had two overloads of the `activated` signal: `activated(int)` and `activated(const QString&)`. Qt's **name-based auto-connection** mechanism (`on_<object>_<signal>`, no explicit `connect()` needed) relied on the `QString` overload for slots with that signature. **Qt6 removed the `QString` overload** entirely — only `activated(int index)` remains. If a slot `on_xxxComboBox_activated(QString const&)` existed in the Qt5 code, the auto-connection now fails **silently** (no compile error, just a runtime warning that's often filtered out by custom loggers), and the combo box stops working.
 
 Fix:
 ```cpp
@@ -215,40 +215,40 @@ void MyClass::on_myComboBox_activated (int index)
   ...
 }
 ```
-(cambiare la firma anche nell'header/dichiarazione dello slot)
+(also change the signature in the header/slot declaration)
 
-**Come diagnosticarlo:** se un controllo UI smette di reagire senza errori né crash, e la firma dello slot coinvolto prende una `QString` da un segnale `activated`/`currentIndexChanged`/simili, sospetta subito questo pattern — è silenzioso e facile da perdere.
+**How to diagnose it:** if a UI control stops responding with no errors or crashes, and the slot's signature involved takes a `QString` from an `activated`/`currentIndexChanged`/similar signal, suspect this pattern right away — it's silent and easy to miss.
 
-### Rendering nativo macOS di `QSlider` con `invertedAppearance` cambiato tra Qt5/Qt6
-Uno slider verticale con `invertedAppearance="true"` (per far salire il valore verso l'alto invece che verso il basso) può risultare con il riempimento colorato (blu/grigio) **invertito** rispetto a Qt5, perché `QMacStyle` in Qt6 disegna i controlli nativi macOS (`NSSlider`) in modo leggermente diverso. Non è un bug del codice, è un cambiamento di comportamento del tema nativo.
+### macOS native `QSlider` rendering with `invertedAppearance` changed between Qt5/Qt6
+A vertical slider with `invertedAppearance="true"` (to make the value increase upward instead of downward) can end up with the colored fill (blue/gray) **inverted** compared to Qt5, because `QMacStyle` in Qt6 draws native macOS controls (`NSSlider`) slightly differently. This isn't a code bug, it's a native theme behavior change.
 
-Fix più affidabile: **forzare uno stylesheet Qt esplicito** sul widget, bypassando il rendering nativo:
+More reliable fix: **force an explicit Qt stylesheet** on the widget, bypassing native rendering:
 ```css
 QSlider::groove:vertical { background: #b0b0b0; width: 6px; border-radius: 3px; }
 QSlider::handle:vertical { background: white; border: 1px solid #5c5c5c; height: 16px; margin: 0 -8px; border-radius: 8px; }
-QSlider::sub-page:vertical { background: #b0b0b0; border-radius: 3px; }   /* verso il minimo */
-QSlider::add-page:vertical { background: #2f7fd6; border-radius: 3px; }   /* verso il massimo */
+QSlider::sub-page:vertical { background: #b0b0b0; border-radius: 3px; }   /* toward the minimum */
+QSlider::add-page:vertical { background: #2f7fd6; border-radius: 3px; }   /* toward the maximum */
 ```
-Se il risultato appare ancora invertito rispetto a quanto voluto, scambia semplicemente i colori tra `sub-page` e `add-page` (dipende dalla combinazione di `orientation`/`invertedAppearance`/`invertedControls` del widget specifico — più semplice provare empiricamente che calcolare a priori).
+If the result still looks inverted relative to what you want, simply swap the colors between `sub-page` and `add-page` (it depends on the specific widget's combination of `orientation`/`invertedAppearance`/`invertedControls` — easier to test empirically than to calculate ahead of time).
 
 ---
 
-## 8. `CMAKE_PREFIX_PATH` — Homebrew keg-only e percorso "ombrello"
+## 8. `CMAKE_PREFIX_PATH` — Homebrew keg-only and the "umbrella" path
 
-Passare i singoli prefix keg-only di ogni modulo Qt6 (`/opt/homebrew/opt/qtbase;/opt/homebrew/opt/qtserialport;...`) ha funzionato per settimane, poi **ha smesso di funzionare da un giorno all'altro** (in particolare, `find_package` non trovava più `Qt6SerialPort`, pur essendo il pacchetto installato e aggiornato). Causa sospetta: un cambiamento in come Homebrew organizza/linka i file CMake di alcuni moduli tra un aggiornamento e l'altro.
+Passing the individual keg-only prefixes for each Qt6 module (`/opt/homebrew/opt/qtbase;/opt/homebrew/opt/qtserialport;...`) worked for weeks, then **stopped working overnight** (specifically, `find_package` could no longer find `Qt6SerialPort`, even though the package was installed and up to date). Suspected cause: a change in how Homebrew organizes/links the CMake files for some modules between updates.
 
-**Soluzione più robusta**: usare il prefix "ombrello" di Homebrew invece dei singoli percorsi `opt/<formula>`:
+**More robust solution**: use Homebrew's "umbrella" prefix instead of the individual `opt/<formula>` paths:
 ```bash
-# Invece di:
+# Instead of:
 -DCMAKE_PREFIX_PATH="/opt/homebrew/opt/qtbase;/opt/homebrew/opt/qtserialport;/opt/homebrew/opt/qtmultimedia;/opt/homebrew/opt/qtwebsockets;/opt/homebrew/opt/qttools;/opt/homebrew/opt/hamlib-471"
 
-# Usa:
+# Use:
 -DCMAKE_PREFIX_PATH="/opt/homebrew;/opt/homebrew/opt/hamlib-471"
 ```
-Il percorso singolo `/opt/homebrew` attraversa i link simbolici centralizzati di Homebrew e trova comunque tutti i moduli Qt6, in modo più resiliente ai cambi di struttura interna di una singola formula.
+The single `/opt/homebrew` path traverses Homebrew's centralized symlinks and still finds all the Qt6 modules, in a way that's more resilient to internal structure changes in any single formula.
 
-**Nota su `sudo` e permessi**: ogni `sudo cmake --build . --target install` lascia alcuni file dentro `build/CMakeFiles/git-data/` di proprietà di `root`. Se poi si tenta di ricompilare **senza** `sudo`, si ottiene un errore criptico tipo `Operation not permitted` sul target `revisiontag` (che tenta di aggiornare l'hash Git). Soluzione più semplice: **non riusare mai una cartella `build/` che ha visto un `sudo`** — cancellarla e ricrearla da zero (`rm -rf build && mkdir build`) prima della prossima compilazione normale.
+**Note on `sudo` and permissions**: every `sudo cmake --build . --target install` leaves some files inside `build/CMakeFiles/git-data/` owned by `root`. If you then try to rebuild **without** `sudo`, you get a cryptic `Operation not permitted` error on the `revisiontag` target (which tries to update the Git hash). Simplest fix: **never reuse a `build/` directory that has seen a `sudo` build** — delete it and recreate it from scratch (`rm -rf build && mkdir build`) before the next normal build.
 
 ---
 
-*Compilato durante il porting di wsjt-z (branch spud) a Qt6 su macOS Apple Silicon, luglio 2026.*
+*Compiled during the port of wsjt-z (spud branch) to Qt6 on macOS Apple Silicon, July 2026, with assistance from Claude (Anthropic).*

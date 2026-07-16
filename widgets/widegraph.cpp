@@ -95,7 +95,19 @@ WideGraph::WideGraph(QSettings * settings, QWidget *parent) :
     ui->widePlot->setStartFreq(m_settings->value("StartFreq",0).toInt());
     ui->fStartSpinBox->setValue(ui->widePlot->startFreq());
     m_waterfallPalette=m_settings->value("WaterfallPalette","Default").toString();
-    m_userPalette = WFPalette {m_settings->value("UserPalette").value<WFPalette::Colours> ()};
+    {
+      WFPalette::Colours restored_colours;
+      auto const colour_strings = m_settings->value ("UserPalette").toStringList ();
+      for (auto const& s : colour_strings)
+        {
+          auto const parts = s.split (',');
+          if (3 == parts.size ())
+            {
+              restored_colours << QColor (parts[0].toInt (), parts[1].toInt (), parts[2].toInt ());
+            }
+        }
+      m_userPalette = WFPalette {restored_colours};
+    }
     m_fMinPerBand = m_settings->value ("FminPerBand").toHash ();
     setRxRange ();
     ui->controls_widget->setVisible(!m_settings->value("HideControls",false).toBool());
@@ -150,13 +162,21 @@ void WideGraph::saveSettings()                                           //saveS
   m_settings->setValue ("BinsPerPixel", ui->widePlot->binsPerPixel ());
   m_settings->setValue ("StartFreq", ui->widePlot->startFreq ());
   m_settings->setValue ("WaterfallPalette", m_waterfallPalette);
-  m_settings->setValue ("UserPalette", QVariant::fromValue (m_userPalette.colours ()));
+  {
+    QStringList colour_strings;
+    for (auto const& c : m_userPalette.colours ())
+      {
+        colour_strings << QString ("%1,%2,%3").arg (c.red ()).arg (c.green ()).arg (c.blue ());
+      }
+    m_settings->setValue ("UserPalette", colour_strings);
+  }
   m_settings->setValue("Flatten",m_bFlatten);
   m_settings->setValue("UseRef",m_bRef);
   m_settings->setValue ("HideControls", ui->controls_widget->isHidden ());
   m_settings->setValue ("Bars", m_bars);
   m_settings->setValue ("Clear", m_clear);
   m_settings->setValue ("FminPerBand", m_fMinPerBand);
+  m_settings->sync ();
 }
 
 void WideGraph::drawRed(int ia, int ib)

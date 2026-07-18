@@ -2042,9 +2042,26 @@ void Configuration::impl::read_settings ()
 
   stations_.station_list (settings_->value ("stations").value<StationList::Stations> ());
 
-  auto highlight_items = settings_->value ("DecodeHighlighting", QVariant::fromValue (DecodeHighlightingModel::default_items ())).value<DecodeHighlightingModel::HighlightItems> ();
-  if (!highlight_items.size ()) highlight_items = DecodeHighlightingModel::default_items ();
-  decode_highlighing_model_.items (highlight_items);
+  {
+    DecodeHighlightingModel::HighlightItems highlight_items;
+    auto const json_string = settings_->value ("DecodeHighlighting").toString ();
+    if (!json_string.isEmpty ())
+      {
+        auto const doc = QJsonDocument::fromJson (json_string.toUtf8 ());
+        for (auto const& v : doc.array ())
+          {
+            auto const obj = v.toObject ();
+            DecodeHighlightingModel::HighlightInfo info;
+            info.type_ = static_cast<DecodeHighlightingModel::Highlight> (obj["type"].toInt ());
+            info.enabled_ = obj["enabled"].toBool ();
+            info.foreground_ = obj["foreground_unset"].toBool () ? QBrush {} : QBrush {QColor {obj["foreground"].toString ()}};
+            info.background_ = obj["background_unset"].toBool () ? QBrush {} : QBrush {QColor {obj["background"].toString ()}};
+            highlight_items << info;
+          }
+      }
+    if (!highlight_items.size ()) highlight_items = DecodeHighlightingModel::default_items ();
+    decode_highlighing_model_.items (highlight_items);
+  }
   highlight_by_mode_ = settings_->value("HighlightByMode", false).toBool ();
   highlight_only_fields_ = settings_->value("OnlyFieldsSought", false).toBool ();
   include_WAE_entities_ = settings_->value("IncludeWAEEntities", false).toBool ();
@@ -2278,7 +2295,22 @@ void Configuration::impl::write_settings ()
     QJsonDocument doc {arr};
     settings_->setValue ("FrequenciesForRegionModes_v2", QString::fromUtf8 (doc.toJson (QJsonDocument::Compact)));
   }
-  settings_->setValue ("DecodeHighlighting", QVariant::fromValue (decode_highlighing_model_.items ()));
+  {
+    QJsonArray arr;
+    for (auto const& info : decode_highlighing_model_.items ())
+      {
+        QJsonObject obj;
+        obj["type"] = static_cast<int> (info.type_);
+        obj["enabled"] = info.enabled_;
+        obj["foreground_unset"] = (Qt::NoBrush == info.foreground_.style ());
+        obj["background_unset"] = (Qt::NoBrush == info.background_.style ());
+        obj["foreground"] = info.foreground_.color ().name (QColor::HexArgb);
+        obj["background"] = info.background_.color ().name (QColor::HexArgb);
+        arr.append (obj);
+      }
+    QJsonDocument doc {arr};
+    settings_->setValue ("DecodeHighlighting", QString::fromUtf8 (doc.toJson (QJsonDocument::Compact)));
+  }
   settings_->setValue ("HighlightByMode", highlight_by_mode_);
   settings_->setValue ("OnlyFieldsSought", highlight_only_fields_);
   settings_->setValue ("IncludeWAEEntities", include_WAE_entities_);

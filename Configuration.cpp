@@ -2040,7 +2040,24 @@ void Configuration::impl::read_settings ()
         }
     }
 
-  stations_.station_list (settings_->value ("stations").value<StationList::Stations> ());
+  {
+    StationList::Stations stations;
+    auto const json_string = settings_->value ("stations").toString ();
+    if (!json_string.isEmpty ())
+      {
+        auto const doc = QJsonDocument::fromJson (json_string.toUtf8 ());
+        for (auto const& v : doc.array ())
+          {
+            auto const obj = v.toObject ();
+            StationList::Station s;
+            s.band_name_ = obj["band_name"].toString ();
+            s.offset_ = static_cast<StationList::FrequencyDelta> (obj["offset"].toDouble ());
+            s.antenna_description_ = obj["antenna_description"].toString ();
+            stations << s;
+          }
+      }
+    stations_.station_list (stations);
+  }
 
   {
     DecodeHighlightingModel::HighlightItems highlight_items;
@@ -2276,7 +2293,19 @@ void Configuration::impl::write_settings ()
   settings_->setValue ("After73", id_after_73_);
   settings_->setValue ("TxQSYAllowed", tx_QSY_allowed_);
   settings_->setValue ("Macros", macros_.stringList ());
-  settings_->setValue ("stations", QVariant::fromValue (stations_.station_list ()));
+  {
+    QJsonArray arr;
+    for (auto const& s : stations_.station_list ())
+      {
+        QJsonObject obj;
+        obj["band_name"] = s.band_name_;
+        obj["offset"] = static_cast<qint64> (s.offset_);
+        obj["antenna_description"] = s.antenna_description_;
+        arr.append (obj);
+      }
+    QJsonDocument doc {arr};
+    settings_->setValue ("stations", QString::fromUtf8 (doc.toJson (QJsonDocument::Compact)));
+  }
   {
     QJsonArray arr;
     for (auto const& item : frequencies_.frequency_list ())

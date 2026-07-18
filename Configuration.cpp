@@ -1974,10 +1974,30 @@ void Configuration::impl::read_settings ()
           LOG_INFO(QString{"read_settings ALSO found FrequenciesForRegionModes"});
         }
 
-      auto const& v = settings_->value ("FrequenciesForRegionModes_v2");
-      if (v.isValid ())
+      auto const json_string = settings_->value ("FrequenciesForRegionModes_v2").toString ();
+      if (!json_string.isEmpty ())
         {
-          frequencies_.frequency_list (v.value<FrequencyList_v2_101::FrequencyItems> ());
+          FrequencyList_v2_101::FrequencyItems list;
+          auto const doc = QJsonDocument::fromJson (json_string.toUtf8 ());
+          auto const arr = doc.array ();
+          for (auto const& item : arr)
+            {
+              auto const obj = item.toObject ();
+              FrequencyList_v2_101::Item freq;
+              freq.frequency_ = static_cast<Radio::Frequency> (obj["frequency_hz"].toDouble ());
+              freq.region_ = IARURegions::value (obj["region"].toString ());
+              freq.mode_ = Modes::value (obj["mode"].toString ());
+              freq.description_ = obj["description"].toString ();
+              freq.source_ = obj["source"].toString ();
+              freq.start_time_ = QDateTime::fromString (obj["start_time"].toString (), Qt::ISODate);
+              freq.end_time_ = QDateTime::fromString (obj["end_time"].toString (), Qt::ISODate);
+              freq.preferred_ = obj["preferred"].toBool ();
+              if (freq.isSane ())
+                {
+                  list.push_back (freq);
+                }
+            }
+          frequencies_.frequency_list (list);
         }
       else
         {
@@ -2240,7 +2260,24 @@ void Configuration::impl::write_settings ()
   settings_->setValue ("TxQSYAllowed", tx_QSY_allowed_);
   settings_->setValue ("Macros", macros_.stringList ());
   settings_->setValue ("stations", QVariant::fromValue (stations_.station_list ()));
-  settings_->setValue ("FrequenciesForRegionModes_v2", QVariant::fromValue (frequencies_.frequency_list ()));
+  {
+    QJsonArray arr;
+    for (auto const& item : frequencies_.frequency_list ())
+      {
+        QJsonObject obj;
+        obj["frequency_hz"] = static_cast<qint64> (item.frequency_);
+        obj["mode"] = Modes::name (item.mode_);
+        obj["region"] = IARURegions::name (item.region_);
+        obj["description"] = item.description_;
+        obj["source"] = item.source_;
+        obj["start_time"] = item.start_time_.toString (Qt::ISODate);
+        obj["end_time"] = item.end_time_.toString (Qt::ISODate);
+        obj["preferred"] = item.preferred_;
+        arr.append (obj);
+      }
+    QJsonDocument doc {arr};
+    settings_->setValue ("FrequenciesForRegionModes_v2", QString::fromUtf8 (doc.toJson (QJsonDocument::Compact)));
+  }
   settings_->setValue ("DecodeHighlighting", QVariant::fromValue (decode_highlighing_model_.items ()));
   settings_->setValue ("HighlightByMode", highlight_by_mode_);
   settings_->setValue ("OnlyFieldsSought", highlight_only_fields_);

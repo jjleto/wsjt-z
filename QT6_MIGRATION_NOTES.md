@@ -336,4 +336,33 @@ Check first with `grep -c $'\r' <file>` (or `file <file>`) whether the file is p
 
 ---
 
+## 11. The same `QVariant` pattern recurs — a checklist for finding every instance
+
+After fixing the waterfall palette (§9), the frequency table (§10), and — following the same pattern — the decode-highlighting color table and the station list (antenna/offset per band), it became clear this is a **systemic** issue, not an isolated one: **any custom type or templated container of a custom type saved via `QVariant::fromValue()` and read back via `.value<T>()` into `QSettings` is at risk on Qt6/macOS**, regardless of which specific type it is.
+
+**Two more instances fixed with the identical technique** (explicit JSON serialization instead of `QVariant`):
+
+- **Decode highlighting colors** (`DecodeHighlightingModel::HighlightItems`, key `"DecodeHighlighting"`) — same fix pattern as the palette, but with an extra subtlety: `HighlightInfo` stores `QBrush` (not `QColor`) for foreground/background, and some default entries (e.g. the "LoTW User" row) intentionally use an **unset brush** (`Qt::NoBrush` style) rather than a real color, to mean "no highlight". A naive `.color().name(...)` serialization collapses that distinction into a real (black) color. Fix: store an explicit `"..._unset"` boolean flag alongside the color string, and reconstruct `QBrush {}` (default, `Qt::NoBrush`) instead of a colored brush when that flag is set:
+  ```cpp
+  // Save
+  obj["foreground_unset"] = (Qt::NoBrush == info.foreground_.style ());
+  obj["foreground"] = info.foreground_.color ().name (QColor::HexArgb);
+  // Load
+  info.foreground_ = obj["foreground_unset"].toBool () ? QBrush {} : QBrush {QColor {obj["foreground"].toString ()}};
+  ```
+
+- **Station list** (`StationList::Stations`, antenna/offset per band, key `"stations"`) — simplest of the lot (a `QString`, a numeric offset, another `QString`), fixed with the same JSON pattern, no locale concerns since the offset is stored as a plain integer.
+
+**How to find every instance of this bug class in one pass, instead of discovering them one at a time through user reports:**
+```bash
+grep -n "QVariant::fromValue\|\.value<.*::.*>" Configuration.cpp | grep -v "int\|bool\|QString\|double\|float\|qint\|quint"
+```
+This surfaces every `QVariant` round-trip involving a type with a `::` in its name (a strong signal of a custom enum/struct/container, as opposed to a plain built-in type). **Not every hit is actually at risk**, though — filter out:
+- Values that only round-trip **within the same session** (e.g. populating a combo box's item data in memory, never written to `QSettings`) — `QVariant` handles same-session round-trips of custom types fine; the bug is specific to persisting through the macOS `.plist` backend across app restarts.
+- Reads of genuinely obsolete/legacy setting keys used only for one-time migration from an older version's format — low priority, since a failure there just means old data isn't migrated forward, not that current data is lost.
+
+For everything else — anything read from and written to `QSettings` on every normal save/load cycle — assume it's affected until proven otherwise, and apply the same fix: replace `QVariant::fromValue()`/`.value<T>()` with an explicit `QJsonArray`/`QJsonObject` serialization, one field at a time, taking care that no field passes through a locale-aware formatter (see §10's locale pitfall) before being written.
+
+---
+
 *Compiled during the port of wsjt-z (spud branch) to Qt6 on macOS Apple Silicon, July 2026, with assistance from Claude (Anthropic).*

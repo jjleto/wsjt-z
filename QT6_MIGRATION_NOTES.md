@@ -251,4 +251,89 @@ The single `/opt/homebrew` path traverses Homebrew's centralized symlinks and st
 
 ---
 
+## 9. `QVariant` and templated containers of native types (e.g. `QList<QColor>`)
+
+Even after confirming that Qt6's automatic stream-operator detection works fine for simple types (see §2, `qRegisterMetaTypeStreamOperators`), a **more subtle case** surfaced: a `QList<QColor>` (used here as a custom user-defined color palette, `WFPalette::Colours`) saved via `QVariant::fromValue()` and read back via `.value<WFPalette::Colours>()` **silently failed to round-trip** through `QSettings` on macOS.
+
+**Symptoms:** the value written on save was correct (confirmed with `fprintf` diagnostics — a save right before quitting showed the expected number of colors), but on the next launch, reading it back always produced an empty list, and `QVariant::canConvert<WFPalette::Colours>()` returned `false`. No error, no warning — the data was just gone.
+
+**Root cause:** `QColor` itself has native, well-known stream operators, and simple aggregate types generally round-trip fine. But a **templated container of such a type** (`QList<QColor>`), especially when stored to a native macOS settings backend (a `.plist` file, not a plain text `.ini`), doesn't reliably survive the `QVariant`-based serialization path in Qt6 — likely because the type-erasure/registration Qt6 relies on for "automatic" detection doesn't cover templated containers the same way it covers plain structs with hand-written operators.
+
+**Fix — bypass `QVariant`'s automatic serialization entirely for this case, using an explicit, portable string format:**
+
+```cpp
+// Save
+{
+  QStringList colour_strings;
+  for (auto const& c : m_userPalette.colours ())
+    {
+      colour_strings << QString ("%1,%2,%3").arg (c.red ()).arg (c.green ()).arg (c.blue ());
+    }
+  m_settings->setValue ("UserPalette", colour_strings);
+}
+
+// Load
+{
+  WFPalette::Colours restored_colours;
+  auto const colour_strings = m_settings->value ("UserPalette").toStringList ();
+  for (auto const& s : colour_strings)
+    {
+      auto const parts = s.split (',');
+      if (3 == parts.size ())
+        {
+          restored_colours << QColor (parts[0].toInt (), parts[1].toInt (), parts[2].toInt ());
+        }
+    }
+  m_userPalette = WFPalette {restored_colours};
+}
+```
+
+`QStringList` is a plain, well-understood type for `QSettings` on every platform and backend — no ambiguity, no silent failures.
+
+**How to diagnose this class of bug:** if a setting round-trips correctly *within the same session* (e.g. an immediate preview after changing it works) but is lost specifically *across an app restart*, and the setting in question is a custom type or a container of a custom/complex type (not a plain `int`/`QString`/`bool`), suspect this exact issue. A quick diagnostic is to log both `.size()` on save and `QVariant::canConvert<T>()` on load — if `canConvert` is `false` on load despite a successful save, this is almost certainly it.
+
+⚠️ **Also worth checking nearby**: an explicit `m_settings->sync ()` call after writing values that matter at shutdown time is good practice regardless — Qt normally flushes `QSettings` automatically on destruction, but if the application exits very quickly after emitting a "finished"/close signal chain (as WSJT-X's `MainWindow::closeEvent` → `Q_EMIT finished()` → child window `close()` → child `saveSettings()` chain does), there's a narrow window where the last write in that chain might not hit disk before the process exits. It didn't turn out to be the root cause here, but it's a cheap, harmless safety net to add at the end of any `saveSettings()` that runs late in the shutdown sequence.
+
+---
+
+## 10. `QVariant`/`FrequencyList_v2_101::FrequencyItems` and a locale pitfall in the JSON fix itself
+
+Same underlying disease as §9 (`QVariant` failing to reliably round-trip a templated container of a custom type through `QSettings` on Qt6/macOS), but this time on the frequency table (`FrequenciesForRegionModes_v2`), and with an extra twist worth documenting on its own.
+
+**Symptom:** editing an entry in the frequency table and saving settings appeared to work, but the change (and eventually the *entire* table) was lost on the next app launch.
+
+**Root cause, part 1 (same as §9):** `settings_->value("FrequenciesForRegionModes_v2").value<FrequencyList_v2_101::FrequencyItems>()` silently returned an empty list on Qt6/macOS, exactly like the `QList<QColor>` case.
+
+**Fix attempt, and the trap it walked into:** the class already had a `QJsonObject Item::toJson() const` method, used for the existing manual import/export-to-file feature. The natural fix looked like: serialize the whole list to a compact JSON string and store *that* string in `QSettings` instead of relying on `QVariant::fromValue()`.
+
+**Root cause, part 2 (the actual bug in the fix):** `Item::toJson()` writes the frequency field via `Radio::frequency_MHz_string()`, which formats the number **according to the current locale** — on a system set to Italian, that means a comma as the decimal separator (`"0,198000"`) instead of a dot. When reading it back, `QString::toDouble()` always expects a dot regardless of locale, so parsing silently produced `0.0` for every entry, and each item was then discarded by the `isSane()` sanity check — hence an empty table after "successfully" round-tripping through JSON.
+
+**Correct fix:** for the internal `QSettings` round-trip (as opposed to the user-facing import/export-to-file feature, which is free to keep the human-readable MHz string), store the frequency as a **plain integer number of Hz** — locale-independent by construction:
+
+```cpp
+// Save
+QJsonObject obj;
+obj["frequency_hz"] = static_cast<qint64> (item.frequency_);   // Hz, not a locale-formatted MHz string
+obj["mode"] = Modes::name (item.mode_);
+obj["region"] = IARURegions::name (item.region_);
+// ... other fields via QJsonObject, same idea as Item::toJson()
+
+// Load
+freq.frequency_ = static_cast<Radio::Frequency> (obj["frequency_hz"].toDouble ());
+```
+
+**How to diagnose this class of bug:** if a JSON-based settings round-trip "works" on the machine you tested it on but you suspect locale sensitivity, test explicitly with a non-English system locale (or just inspect the raw JSON string via a diagnostic print) and look for decimal separators, date formats, or thousands separators that don't match what a strict `QJsonValue`/`QString::toDouble()` parser expects. `QString::toDouble()` and `QJsonValue`-based parsing are locale-independent by design (always dot-decimal), but *anything* that goes through a locale-aware formatter first (like the MHz-string helper here) breaks that guarantee the moment it's read back on a differently-configured machine — including, notably, the very same machine, if any locale-aware formatting was involved in producing the string in the first place, regardless of what locale is active at read time.
+
+⚠️ **A second, unrelated trap hit while working on this fix, worth flagging for anyone repeating this kind of change**: `Configuration.cpp` (like a few other files in this codebase) has **mixed CRLF/LF line endings**. A naive Python text-mode edit (`open(path, 'r')` / `open(path, 'w')`, i.e. universal newlines) silently normalizes every line ending to `\n`, which makes `git diff` show the *entire file* as changed even when the actual content edit was a handful of lines. This doesn't break anything functionally, but it produces a huge, misleading diff that's unpleasant to review. Fix: read the file in a way that preserves its existing line endings, do the text replacement, then write it back forcing the *original* line-ending style:
+```python
+with open(path, 'r') as f:      # universal-newline read is fine for the string match itself
+    content = f.read()
+# ... do the .replace() on content, using \n line endings in the old/new blocks ...
+with open(path, 'w', newline='\r\n') as f:   # force CRLF back if that's what the file originally had
+    f.write(content)
+```
+Check first with `grep -c $'\r' <file>` (or `file <file>`) whether the file is predominantly CRLF or LF before choosing which one to force on write.
+
+---
+
 *Compiled during the port of wsjt-z (spud branch) to Qt6 on macOS Apple Silicon, July 2026, with assistance from Claude (Anthropic).*

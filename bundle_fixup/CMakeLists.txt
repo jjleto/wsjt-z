@@ -87,6 +87,7 @@ if (APPLE OR WIN32)
         \"${QT_PLUGINS_DIR}/accessible\"
         \"${QT_PLUGINS_DIR}/imageformats\"
         \"${QT_PLUGINS_DIR}/styles\"
+        \"${QT_PLUGINS_DIR}/tls\"
         DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${WSJT_PLUGIN_DESTINATION}\"
         FOLLOW_SYMLINK_CHAIN
         FILES_MATCHING PATTERN \"*${CMAKE_SHARED_LIBRARY_SUFFIX}\"

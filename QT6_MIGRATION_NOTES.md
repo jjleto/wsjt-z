@@ -365,4 +365,44 @@ For everything else — anything read from and written to `QSettings` on every n
 
 ---
 
+## 12. macOS bundle, part 2: the `tls/` plugin directory
+
+Qt6 introduced a dedicated **`tls/`** plugins directory (`libqopensslbackend.dylib`, `libqcertonlybackend.dylib`, `libqsecuretransportbackend.dylib`) — this is new relative to Qt5, where TLS support was more often built directly into the network module. §4's bundle fixup list (`platforms`, `audio`, `accessible`, `imageformats`, `styles`) predates this and doesn't include it.
+
+**Symptom:** any feature that opens a TLS connection (in this codebase, the PSK Reporter window) fails at runtime with **"TLS initialization failed"**, even though the system-wide Qt6 installation (verified with `qtdiag6`) reports OpenSSL working correctly. The app *builds* and *launches* fine — it's specifically features that need TLS that fail, because the bundled binary can't find a TLS backend plugin at its own bundled plugin path.
+
+**Fix:** add `tls` to the same `file (COPY ... FOLLOW_SYMLINK_CHAIN ...)` block already used for the other Homebrew-symlinked plugins (see §4):
+```cmake
+file (COPY
+  "${QT_PLUGINS_DIR}/platforms"
+  "${QT_PLUGINS_DIR}/audio"
+  "${QT_PLUGINS_DIR}/accessible"
+  "${QT_PLUGINS_DIR}/imageformats"
+  "${QT_PLUGINS_DIR}/styles"
+  "${QT_PLUGINS_DIR}/tls"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/${WSJT_PLUGIN_DESTINATION}"
+  FOLLOW_SYMLINK_CHAIN
+  FILES_MATCHING PATTERN "*${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  ...
+  )
+```
+
+**How to diagnose:** run `qtdiag6` (the Qt6-specific binary — on Homebrew, plain `qtdiag` may be an alias pointing at the old Qt5 install) and check it reports a working OpenSSL/TLS backend system-wide. If it does, but the *bundled app* still fails specifically on TLS features, the plugin is present on the system but missing from the `.app`'s own `PlugIns/` folder — check `ls Contents/PlugIns/` in the installed bundle for a `tls/` subdirectory.
+
+### Unrelated pitfall hit while chasing this: a broken GStreamer.framework can block CMake configuration entirely
+
+While reconfiguring to test the `tls` fix, `cmake ..` failed outright with:
+```
+CMake Error in CMakeLists.txt:
+  Imported target "Qt6::Multimedia" includes non-existent path
+    "/Library/Frameworks/GStreamer.framework/Headers"
+```
+This has nothing to do with the TLS plugin fix — it surfaced because a **system-level GStreamer reinstall** (likely from an unrelated macOS/Homebrew update) had replaced the runtime package but not the **development** package, leaving `GStreamer.framework/Versions/Current` pointing at a version directory that has no `Headers/` subfolder at all. Since this codebase doesn't actually use the GStreamer backend of QtMultimedia (audio goes through `QAudioSource`/`QAudioSink` via Core Audio), the quick, harmless workaround is to satisfy CMake's existence check without reinstalling anything:
+```bash
+sudo mkdir -p /Library/Frameworks/GStreamer.framework/Versions/1.0/Headers
+```
+(adjust the version number to whatever `ls /Library/Frameworks/GStreamer.framework/Versions/` shows as `Current`). The proper long-term fix is reinstalling GStreamer's `-devel` package from `https://gstreamer.freedesktop.org/download/`, but that's not urgent since the headers aren't actually needed for anything this project builds.
+
+---
+
 *Compiled during the port of wsjt-z (spud branch) to Qt6 on macOS Apple Silicon, July 2026, with assistance from Claude (Anthropic).*

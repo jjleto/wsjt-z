@@ -110,12 +110,4 @@
   </action>
  </widget>
  <resources/>
- <connections>
-  <connection>
-   <sender>actionRefresh</sender>
-   <signal>triggered()</signal>
-   <receiver>PSKReporterWidget</receiver>
-   <slot>refresh()</slot>
-  </connection>
- </connections>
 </ui>

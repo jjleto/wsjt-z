@@ -35,6 +35,7 @@ PSKReporterWidget::PSKReporterWidget(QWidget *parent, Configuration * cfg, LogBo
 
     m_refreshTimer = new QTimer(this);
     connect(m_refreshTimer, SIGNAL(timeout()), this, SLOT(refresh()));
+    connect(ui->actionRefresh, &QAction::triggered, this, [this]() { refresh(); });
     m_refreshTimer->start(5 * 60 * 1000);
 
     ui->actionRefresh->setAutoRepeat(false);

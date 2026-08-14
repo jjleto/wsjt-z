@@ -405,4 +405,35 @@ sudo mkdir -p /Library/Frameworks/GStreamer.framework/Versions/1.0/Headers
 
 ---
 
+## 13. A large upstream merge (221 commits) — strategy and one more Qt6-specific bug
+
+After the port had been stable for a while, `spud2` received a very large batch of upstream work (221 commits: new DX station map features, decode-label overlays on the waterfall, GitHub Actions CI workflows, macOS entitlements-based code signing, and more). Merging that much history into `qt6-port` at once could have been risky, but turned out manageable by combining a few habits already established in this project:
+
+- **Use `git merge`, not `git rebase`, for large batches.** A rebase would have replayed each of our ~20 Qt6 commits individually on top of 221 new commits, multiplying the chances of hitting the same conflict repeatedly. A single merge resolves conflicts exactly once, regardless of how many commits are behind it.
+- **`diff --strip-trailing-cr` before touching any "whole file in conflict" case.** Out of 7 files Git reported as conflicted, most turned out to have only a handful of real differing lines once CRLF/LF noise was stripped out — the same recurring line-ending mismatch documented in earlier sections. Always check this before assuming a conflict is substantial.
+- **Reintegrate our additions on top of the newer upstream base, not the other way around.** For files where upstream had added genuinely new functionality (e.g. a new `RotateLog` UDP message type, entitlements-based codesigning, new `WideGraph` decode-label overlay features), the right move was consistently to take upstream's version as the base and re-apply our specific patches (the `bind_address` security parameter, the Qt6 plugin `FOLLOW_SYMLINK_CHAIN` fix, the palette JSON serialization, the `activated(int)` signature fix) on top — not to try to merge line-by-line in the opposite direction.
+
+### One new Qt6-specific compile error from this merge: ambiguous `.ui`-based auto-connection to an overloaded slot
+
+`pskreporterwidget.ui` had a `<connections>` block created for the menu action inside Qt Designer:
+```xml
+<connection>
+  <sender>actionRefresh</sender>
+  <signal>triggered()</signal>
+  <receiver>PSKReporterWidget</receiver>
+  <slot>refresh()</slot>
+</connection>
+```
+but the real C++ slot has a default argument: `void refresh(bool init = false);`. Qt5's `uic`-generated connection code tolerated this. In Qt6, the generated code became stricter about resolving the exact overload, and failed to compile with `no matching function for call to object of type 'const QOverload<>'` — essentially, Qt6 could no longer disambiguate which `refresh` overload the zero-argument `<slot>refresh()</slot>` in the `.ui` file was supposed to bind to, because `refresh(bool = false)` is a single function with a default argument, not two distinct overloads, and the code Qt6 generates for the old `<connections>` XML mechanism expects an exact, unambiguous signature match.
+
+**Fix:** remove the `<connections>` block from the `.ui` file entirely, and add an explicit `connect()` call in the constructor instead:
+```cpp
+connect(ui->actionRefresh, &QAction::triggered, this, [this]() { refresh(); });
+```
+This is more robust anyway (explicit connections are easier to grep for and don't depend on Designer-generated glue code), and sidesteps the overload-resolution ambiguity entirely since the lambda makes the call unambiguous.
+
+**How to recognize this class of bug:** if a Qt6 compile error mentions `QOverload` or "no matching function" pointing into a generated `ui_*.h` file (not your own `.cpp`), the root cause is very likely a `.ui`-file `<connections>` entry (Qt Designer's old "signal/slot editor" mechanism) targeting a slot that has a default argument or is otherwise overloaded. Check the `.ui` file's `<connections>` section for the slot name mentioned in the error.
+
+---
+
 *Compiled during the port of wsjt-z (spud branch) to Qt6 on macOS Apple Silicon, July 2026, with assistance from Claude (Anthropic).*

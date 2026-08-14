@@ -2401,7 +2401,49 @@ list. The list can be maintained in Settings (F2).</string>
                            </property>
                           </widget>
                          </item>
-                         <item row="10" column="0" colspan="2">
+                         <item row="10" column="0">
+                          <layout class="QHBoxLayout" name="horizontalLayout_priority">
+                           <item>
+                            <widget class="QLabel" name="label_23">
+                             <property name="text">
+                              <string>Priority:</string>
+                             </property>
+                             <property name="alignment">
+                              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QComboBox" name="cb_autoCallPriority">
+                             <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                               <horstretch>0</horstretch>
+                               <verstretch>0</verstretch>
+                              </sizepolicy>
+                             </property>
+                             <property name="toolTip">
+                              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Priority of automatic station selection:&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;- Last decoded: &lt;/span&gt;call last decoded station&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;- Distance: &lt;/span&gt;call the station with the longest distance&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;- Signal strength: &lt;/span&gt;call the station with the strongest signal&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                             </property>
+                             <item>
+                              <property name="text">
+                               <string>Last decoded</string>
+                              </property>
+                             </item>
+                             <item>
+                              <property name="text">
+                               <string>Signal strength</string>
+                              </property>
+                             </item>
+                             <item>
+                              <property name="text">
+                               <string>Distance</string>
+                              </property>
+                             </item>
+                            </widget>
+                           </item>
+                          </layout>
+                         </item>
+                         <item row="10" column="1">
                           <widget class="QCheckBox" name="cb_autoCallPreferPSKSpotted">
                            <property name="toolTip">
                             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Prefer AutoCall candidates that are already seen by PSK Reporter receivers when PSK Reporter band activity feedback is enabled.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -3125,7 +3167,7 @@ list. The list can be maintained in Settings (F2).</string>
                           </size>
                          </property>
                          <property name="toolTip">
-                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;List of prefixes and DXCC's to be included or excluded from the band activity window. &lt;/p&gt;&lt;p&gt;Prefixes or DXCC names (prefixed with '+' sign) can be used here.&lt;/p&gt;&lt;p&gt;Each row can contain entries for one band.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Example: &lt;/span&gt;&lt;/p&gt;&lt;p&gt;80m:SP,GB,DE&lt;/p&gt;&lt;p&gt;40m:+poland,+england,+germany&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;List of prefixes, entity names, and regex patterns to be included or excluded from the band activity window.&lt;/p&gt;&lt;p&gt;Each row contains entries for one band in format: &lt;span style=&quot; font-weight:600;&quot;&gt;BAND:entry1,entry2,entry3&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Entry types:&lt;/span&gt;&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Literal prefix:&lt;/span&gt; &lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;SP&lt;/span&gt;, &lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;GB&lt;/span&gt; (matches calls starting with prefix)&lt;/li&gt;&lt;li&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Entity name:&lt;/span&gt; &lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;+poland&lt;/span&gt;, &lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;+Germany&lt;/span&gt; (case-insensitive substring match on DXCC name)&lt;/li&gt;&lt;li&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Regex pattern (&lt;span style=&quot; color:#d00;&quot;&gt;simple patterns only&lt;/span&gt;):&lt;/span&gt; &lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;/3Z|HF/&lt;/span&gt;, &lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;/^(PJ|PJ[0-9])/&lt;/span&gt;, &lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;/..[389]$/&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Examples:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;80m:SP,GB,DE&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;40m:+poland,+england,/3Z|HF/&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-family:&apos;Courier New&apos;;&quot;&gt;20m:/^(PJ|PJ[0-9])/&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Mode:&lt;/span&gt; Use &quot;Show only&quot; to include only matching entries, or &quot;Exclude&quot; to hide matching entries.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                          </property>
                          <property name="plainText">
                           <string/>
@@ -3322,6 +3364,16 @@ list. The list can be maintained in Settings (F2).</string>
                            </property>
                            <property name="text">
                             <string>Add station</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <widget class="QPushButton" name="btn_addToPermIgnore">
+                           <property name="toolTip">
+                            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add the current ignore list to the persistent configuration (merge-only, never removes).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                           </property>
+                           <property name="text">
+                            <string>Add to permaIgnore</string>
                            </property>
                           </widget>
                          </item>
@@ -3671,6 +3723,9 @@ list. The list can be maintained in Settings (F2).</string>
                             <property name="enabled">
                              <bool>true</bool>
                             </property>
+                            <property name="minimum">
+                             <number>1</number>
+                            </property>
                             <property name="maximum">
                              <number>999</number>
                             </property>
@@ -3681,15 +3736,51 @@ list. The list can be maintained in Settings (F2).</string>
                             <property name="enabled">
                              <bool>true</bool>
                             </property>
+                            <property name="minimum">
+                             <number>1</number>
+                            </property>
                             <property name="maximum">
                              <number>999</number>
+                            </property>
+                           </widget>
+                          </item>
+                          <item row="2" column="0">
+                           <widget class="QLabel" name="label_autoRxCount">
+                            <property name="text">
+                             <string>AutoRx #</string>
+                            </property>
+                           </widget>
+                          </item>
+                          <item row="2" column="1">
+                           <widget class="QSpinBox" name="sb_autoRxCount">
+                            <property name="enabled">
+                             <bool>true</bool>
+                            </property>
+                            <property name="maximum">
+                             <number>999</number>
+                            </property>
+                           </widget>
+                          </item>
+                          <item row="2" column="2">
+                           <widget class="QLineEdit" name="le_autoRxLeft">
+                            <property name="enabled">
+                             <bool>true</bool>
+                            </property>
+                            <property name="maximumSize">
+                             <size>
+                              <width>40</width>
+                              <height>16777215</height>
+                             </size>
+                            </property>
+                            <property name="readOnly">
+                             <bool>true</bool>
                             </property>
                            </widget>
                           </item>
                          </layout>
                         </widget>
                        </item>
-                       <item row="1" column="1">
+                       <item row="2" column="1">
                         <layout class="QHBoxLayout" name="horizontalLayout_5">
                          <property name="spacing">
                           <number>6</number>
@@ -3722,7 +3813,7 @@ list. The list can be maintained in Settings (F2).</string>
                          </item>
                         </layout>
                        </item>
-                       <item row="2" column="0" colspan="2">
+                       <item row="2" column="0">
                         <layout class="QHBoxLayout" name="horizontalLayout_17">
                          <item>
                           <widget class="QCheckBox" name="cbCQonlyIncl73">
@@ -3740,62 +3831,8 @@ list. The list can be maintained in Settings (F2).</string>
                             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When Mode Switching is enabled, alternate TX even/odd at the start of each AutoCQ cycle.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                            </property>
                            <property name="text">
-                            <string>AutoCQ alternate even/odd</string>
+                            <string>AutoCQ even/odd</string>
                            </property>
-                          </widget>
-                         </item>
-                         <item>
-                          <spacer name="horizontalSpacer_8">
-                           <property name="orientation">
-                            <enum>Qt::Horizontal</enum>
-                           </property>
-                           <property name="sizeType">
-                            <enum>QSizePolicy::MinimumExpanding</enum>
-                           </property>
-                           <property name="sizeHint" stdset="0">
-                            <size>
-                             <width>40</width>
-                             <height>20</height>
-                            </size>
-                           </property>
-                          </spacer>
-                         </item>
-                         <item>
-                          <widget class="QLabel" name="label_23">
-                           <property name="text">
-                            <string>Priority:</string>
-                           </property>
-                           <property name="alignment">
-                            <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                           </property>
-                          </widget>
-                         </item>
-                         <item>
-                          <widget class="QComboBox" name="cb_autoCallPriority">
-                           <property name="sizePolicy">
-                            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                             <horstretch>0</horstretch>
-                             <verstretch>0</verstretch>
-                            </sizepolicy>
-                           </property>
-                           <property name="toolTip">
-                            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Priority of automatic station selection:&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;- Last decoded: &lt;/span&gt;call last decoded station&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;- Distance: &lt;/span&gt;call the station with the longest distance&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;- Signal strength: &lt;/span&gt;call the station with the strongest signal&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                           </property>
-                           <item>
-                            <property name="text">
-                             <string>Last decoded</string>
-                            </property>
-                           </item>
-                           <item>
-                            <property name="text">
-                             <string>Signal strength</string>
-                            </property>
-                           </item>
-                           <item>
-                            <property name="text">
-                             <string>Distance</string>
-                            </property>
-                           </item>
                           </widget>
                          </item>
                         </layout>
@@ -4663,7 +4700,7 @@ list. The list can be maintained in Settings (F2).</string>
            <number>12</number>
           </property>
           <property name="sizeConstraint">
-           <enum>QLayout::SetMinimumSize</enum>
+           <enum>QLayout::SetDefaultConstraint</enum>
           </property>
           <item>
            <widget class="QLabel" name="label_16">
@@ -4777,6 +4814,7 @@ list. The list can be maintained in Settings (F2).</string>
     <addaction name="actionDelete_all_wav_files_in_SaveDir"/>
     <addaction name="actionErase_ALL_TXT"/>
     <addaction name="actionErase_wsjtx_log_adi"/>
+    <addaction name="actionRotate_wsjtx_log_adi"/>
     <addaction name="actionErase_WSPR_hashtable"/>
     <addaction name="reset_cabrillo_log_action"/>
     <addaction name="actionExport_Cabrillo_log"/>
@@ -4810,6 +4848,7 @@ list. The list can be maintained in Settings (F2).</string>
     <addaction name="separator"/>
     <addaction name="actionUnfiltered_View"/>
     <addaction name="actionPSKReporter"/>
+    <addaction name="actionDXStationMap"/>
    </widget>
    <widget class="QMenu" name="menuDecode">
     <property name="title">
@@ -4880,6 +4919,7 @@ list. The list can be maintained in Settings (F2).</string>
     <addaction name="actionQuickDecode"/>
     <addaction name="actionMediumDecode"/>
     <addaction name="actionDeepestDecode"/>
+    <addaction name="actionMaximumDecode"/>
     <addaction name="separator"/>
     <addaction name="actionUse_multithreaded_FT8_decoder"/>
     <addaction name="menuParameters"/>
@@ -4893,6 +4933,7 @@ list. The list can be maintained in Settings (F2).</string>
     <addaction name="actionAuto_Clear_Avg"/>
     <addaction name="actionDisable_clicks_on_waterfall"/>
     <addaction name="actionReduce_false_decodes"/>
+    <addaction name="actionDX_Mode"/>
     <addaction name="separator"/>
     <addaction name="actionFT8WidebandDXCallSearch"/>
     <addaction name="actionHide_FT8_dupe_messages"/>
@@ -5032,6 +5073,7 @@ list. The list can be maintained in Settings (F2).</string>
   <action name="actionDecFT8cycles3"><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="text"><string>3</string></property></action>
   <action name="actionDisable_clicks_on_waterfall"><property name="checkable"><bool>true</bool></property><property name="text"><string>Disable clicks on waterfall</string></property></action>
   <action name="actionReduce_false_decodes"><property name="checkable"><bool>true</bool></property><property name="text"><string>Reduce false decodes</string></property></action>
+  <action name="actionDX_Mode"><property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property><property name="text"><string>DX Mode (Integer Bin Refinement)</string></property></action>
   <action name="actionHide_AP_info"><property name="checkable"><bool>true</bool></property><property name="text"><string>Hide AP information</string></property></action>
   <action name="actionFT8WidebandDXCallSearch"><property name="checkable"><bool>true</bool></property><property name="text"><string>Wideband DX Call search</string></property></action>
   <action name="actionHide_FT8_dupe_messages"><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="text"><string>Hide FT8 dupe messages</string></property></action>
@@ -5192,6 +5234,17 @@ list. The list can be maintained in Settings (F2).</string>
     <string>Deep</string>
    </property>
   </action>
+  <action name="actionMaximumDecode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Maximum</string>
+   </property>
+  </action>
   <action name="actionErase_ALL_TXT">
    <property name="text">
     <string>Erase ALL.TXT</string>
@@ -5200,6 +5253,11 @@ list. The list can be maintained in Settings (F2).</string>
   <action name="actionErase_wsjtx_log_adi">
    <property name="text">
     <string>Erase wsjtx_log.adi</string>
+   </property>
+  </action>
+  <action name="actionRotate_wsjtx_log_adi">
+   <property name="text">
+    <string>Rotate wsjtx_log.adi</string>
    </property>
   </action>
   <action name="actionJT65">
@@ -5629,6 +5687,11 @@ list. The list can be maintained in Settings (F2).</string>
   <action name="actionPSKReporter">
    <property name="text">
     <string>PSK Reporter</string>
+   </property>
+  </action>
+  <action name="actionDXStationMap">
+   <property name="text">
+    <string>DX Station Map</string>
    </property>
   </action>
  </widget>

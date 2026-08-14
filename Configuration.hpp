@@ -223,6 +223,7 @@ public:
   bool rxTotxFreq() const;
   bool udpFiltering() const;
   bool highlightDX() const;
+  bool hideOwnCall() const;
   bool dbgScreen () const;
   bool dbgFile () const;
   bool dbgBoth () const;
@@ -235,6 +236,7 @@ public:
   bool wd_Timer() const;
   bool processTailenders() const;
   QString permIgnoreList() const;
+  void set_permIgnoreList(QString const& value);
   bool showDistance() const ;
   bool showBearing() const ;
   bool autoTune() const;
@@ -303,6 +305,7 @@ public:
   void transceiver_offline ();
 
   void set_CTY_DAT_version(QString const& version);
+  void rescan_logbook();
 
   // Set transceiver frequency in Hertz.
   Q_SLOT void transceiver_frequency (Frequency);

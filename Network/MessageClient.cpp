@@ -399,9 +399,16 @@ void MessageClient::impl::parse_message (QByteArray const& msg)
                                              , QString::fromUtf8 (dx_call), QString::fromUtf8 (dx_grid)
                                              , generate_messages, auto_cq_enabled, auto_call_enabled);
                   }
-                else
+              }
+              break;
+
+            case NetworkMessage::RotateLog:
+              {
+                auto status = check_status (in);
+                TRACE_UDP ("RotateLog check_status result:" << status);
+                if (status != Fail)
                   {
-                    qDebug () << "Configure message check_status failed!";
+                    Q_EMIT self_->rotate_log ();
                   }
               }
               break;

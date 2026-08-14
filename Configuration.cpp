@@ -823,6 +823,7 @@ private:
   bool rxTotxFreq_;
   bool udpFiltering_;
   bool highlightDX_;
+  bool hideOwnCall_;
   bool dbgScreen_;
   bool dbgFile_;
   bool dbgBoth_;
@@ -861,6 +862,15 @@ Configuration::Configuration (QNetworkAccessManager * network_manager, QDir cons
                               QSettings * settings, LogBook * logbook, QWidget * parent)
   : m_ {this, network_manager, temp_directory, settings, logbook, parent}
 {
+}
+
+void Configuration::rescan_logbook ()
+{
+  auto * impl_ptr = m_.operator-> ();
+  if (impl_ptr && impl_ptr->logbook_)
+    {
+      impl_ptr->logbook_->rescan ();
+    }
 }
 
 Configuration::~Configuration ()
@@ -996,6 +1006,7 @@ bool Configuration::pileupMode() const {return m_->pileupMode_;}
 bool Configuration::rxTotxFreq() const {return m_->rxTotxFreq_;}
 bool Configuration::udpFiltering() const {return m_->udpFiltering_;}
 bool Configuration::highlightDX() const {return m_->highlightDX_;}
+bool Configuration::hideOwnCall() const {return m_->hideOwnCall_;}
 bool Configuration::dbgScreen() const {return m_->dbgScreen_;}
 bool Configuration::dbgFile() const {return m_->dbgFile_;}
 bool Configuration::dbgBoth() const {return m_->dbgBoth_;}
@@ -1009,6 +1020,33 @@ double Configuration::wd_FT2() const {return m_->wd_FT2_;}
 bool Configuration::wd_Timer() const {return m_->wd_Timer_;}
 bool Configuration::processTailenders() const {return m_->processTailenders_;}
 QString Configuration::permIgnoreList() const {return m_->permIgnoreList_;}
+void Configuration::set_permIgnoreList(QString const& value)
+{
+  auto const existing_lines = m_->permIgnoreList_.split(QRegularExpression{"[\r\n]+"}, SkipEmptyParts);
+  auto const incoming_lines = value.split(QRegularExpression{"[\r\n]+"}, SkipEmptyParts);
+
+  QStringList merged_lines = existing_lines;
+  for (auto const& line : incoming_lines)
+    {
+      auto const trimmed = line.trimmed();
+      if (trimmed.isEmpty ())
+        {
+          continue;
+        }
+      if (!merged_lines.contains (trimmed, Qt::CaseInsensitive))
+        {
+          merged_lines << trimmed;
+        }
+    }
+
+  m_->permIgnoreList_ = merged_lines.join (QChar {'\n'});
+  if (m_->ui_)
+    {
+      m_->ui_->te_permIgnoreList->setPlainText(m_->permIgnoreList_);
+    }
+  m_->settings_->setValue("permIgnoreList", m_->permIgnoreList_);
+  m_->settings_->sync();
+}
 bool Configuration::showDistance() const {return m_->showDistance_;}
 bool Configuration::showBearing() const {return m_->showBearing_;}
 bool Configuration::autoTune() const {return m_->autoTune_;}
@@ -1839,6 +1877,7 @@ void Configuration::impl::initialize_models ()
   ui_->cb_rxTotxFreq->setChecked(rxTotxFreq_);
   ui_->cb_udpFiltering->setChecked(udpFiltering_);
   ui_->cb_highlightDX->setChecked(highlightDX_);
+  ui_->cb_hideOwnCall->setChecked(hideOwnCall_);
   ui_->rb_dbg_Both->setChecked(dbgBoth_);
   ui_->rb_dbg_File->setChecked(dbgFile_);
   ui_->rb_dbg_Screen->setChecked(dbgScreen_);
@@ -2181,6 +2220,7 @@ void Configuration::impl::read_settings ()
   rxTotxFreq_ = settings_->value("rxTotxFreq").toBool();
   udpFiltering_ = settings_->value("udpFiltering").toBool();
   highlightDX_ = settings_->value("highlightDX").toBool();
+  hideOwnCall_ = settings_->value("hideOwnCall", false).toBool();
   dbgScreen_ = settings_->value("dbgScreen").toBool();
   dbgBoth_ = settings_->value("dbgBoth").toBool();
   autoFreqNarrow_ = settings_->value("autoFreqNarrow").toBool();
@@ -2426,6 +2466,7 @@ void Configuration::impl::write_settings ()
   settings_->setValue("rxTotxFreq", rxTotxFreq_);
   settings_->setValue("udpFiltering", udpFiltering_);
   settings_->setValue("highlightDX", highlightDX_);
+  settings_->setValue("hideOwnCall", hideOwnCall_);
   settings_->setValue("dbgScreen", dbgScreen_);
   settings_->setValue("dbgFile", dbgFile_);
   settings_->setValue("dbgBoth", dbgBoth_);
@@ -3004,6 +3045,7 @@ void Configuration::impl::accept ()
   autoCQfiltering_ = ui_->cb_autoCQfiltering->isChecked();
   udpFiltering_ = ui_->cb_udpFiltering->isChecked();
   highlightDX_ = ui_->cb_highlightDX->isChecked();
+  hideOwnCall_ = ui_->cb_hideOwnCall->isChecked();
   dbgScreen_ = ui_->rb_dbg_Screen->isChecked();
   dbgFile_ = ui_->rb_dbg_File->isChecked();
   dbgBoth_ = ui_->rb_dbg_Both->isChecked();
@@ -3089,9 +3131,7 @@ void Configuration::impl::on_reset_highlighting_to_defaults_push_button_clicked 
 
 void Configuration::impl::on_rescan_log_push_button_clicked (bool /*clicked*/)
 {
-  if (logbook_) {
-    logbook_->rescan ();
-  }
+  self_->rescan_logbook ();
 }
 
 void Configuration::impl::on_CTY_download_button_clicked (bool /*clicked*/)
@@ -3124,7 +3164,7 @@ void Configuration::impl::after_CTY_downloaded ()
 {
   ui_->CTY_download_button->setEnabled (true);
   if (logbook_) {
-    logbook_->rescan ();
+    self_->rescan_logbook ();
     ui_->CTY_file_label->setText(QString{"CTY File Version: %1"}.arg(logbook_->cty_version()));
   }
 }

@@ -26,6 +26,7 @@
 #include <QFuture>
 #include <QFutureWatcher>
 #include <QDateTime>
+#include <QRegularExpression>
 // Z
 #include <qrzlookup.h>
 
@@ -100,6 +101,7 @@ class WSPRBandHopping;
 // Z
 class UnfilteredView;
 class PSKReporterWidget;
+class DXStationMap;
 
 class HelpTextWindow;
 class WSPRNet;
@@ -111,6 +113,33 @@ class SampleDownloader;
 class MultiSettings;
 class EqualizationToolsDialog;
 class DecodedText;
+
+// Helper struct for prefix filter entries that may be regex or literal
+struct PrefixFilterEntry
+{
+  enum Type { Literal, Regex, Entity };
+  Type type = Literal;
+  QString text;  // original text (with /.../ for regex, + for entity)
+  QRegularExpression regex_compiled;  // only populated if type == Regex
+  
+  PrefixFilterEntry(const QString& raw_text)
+    : text(raw_text)
+  {
+    QString trimmed = raw_text.trimmed();
+    if (trimmed.startsWith('/') && trimmed.endsWith('/') && trimmed.size() >= 3)
+    {
+      type = Regex;
+    }
+    else if (trimmed.startsWith('+'))
+    {
+      type = Entity;
+    }
+    else
+    {
+      type = Literal;
+    }
+  }
+};
 
 class MainWindow
   : public MultiGeometryWidget<3, QMainWindow>
@@ -256,10 +285,13 @@ private slots:
   void on_actionQuickDecode_toggled (bool);
   void on_actionMediumDecode_toggled (bool);
   void on_actionDeepestDecode_toggled (bool);
+  void on_actionMaximumDecode_toggled (bool);
   void bumpFqso(int n);
   void on_actionErase_ALL_TXT_triggered();
   void on_reset_cabrillo_log_action_triggered ();
   void on_actionErase_wsjtx_log_adi_triggered();
+  void on_actionRotate_wsjtx_log_adi_triggered();
+  void rotate_wsjtx_log_adi(bool confirm = true);
   void on_actionErase_WSPR_hashtable_triggered();
   void on_actionErase_list_of_Q65_callers_triggered();
   void on_actionExport_Cabrillo_log_triggered();
@@ -308,6 +340,7 @@ private slots:
   void on_actionInclude_correlation_toggled (bool);
   void on_actionEnable_AP_DXcall_toggled (bool);
   void on_actionAuto_Clear_Avg_toggled (bool);
+  void on_actionDX_Mode_toggled (bool);
   void VHF_features_enabled(bool b);
   void on_sbSubmode_valueChanged(int n);
   void on_cbSendMsg_toggled(bool b);
@@ -423,6 +456,7 @@ private slots:
      // Decode > Wideband DX Call search
      void on_actionFT8WidebandDXCallSearch_toggled(bool checked);
      void on_btn_addToIgnore_clicked();
+     void on_btn_addToPermIgnore_clicked();
      void on_btn_clearIgnore_clicked();
      void on_actionIgnore_station_triggered();
      void on_actionCall_next_triggered();
@@ -458,6 +492,7 @@ private slots:
     double watchdog();
      void on_actionUnfiltered_View_triggered();
      void on_actionPSKReporter_triggered();
+     void on_actionDXStationMap_triggered();
      void updateQsoCounter(bool increment);
      void on_txFirstCheckBox_toggled();
     void update_tx5(const QString &qsy_text);
@@ -499,6 +534,8 @@ private:
   void chkFT4();
   bool elide_tx1_not_allowed () const;
   bool elide_tx2_not_allowed () const;
+  bool isCallingForMe (DecodedText const&, QString& call, QString& grid) const;
+  bool shouldHideOwnCall (DecodedText const&) const;
   void readWidebandDecodes();
   void configActiveStations();
   void showQSYMessage(QString message);
@@ -514,11 +551,13 @@ private:
   // Filter cache: parsed once when the QPlainTextEdit changes, reused per-decode.
   // Invalidated by textChanged signals connected in the ctor.
   void invalidateFilterCache() { m_filterCacheValid = false; }
-  void rebuildFilterCache() const;
+  void rebuildFilterCache();  // Not const; calls log() and modifies mutable caches
   mutable bool m_filterCacheValid = false;
   mutable QStringList m_ignoredStationsCache;
   mutable QStringList m_prefixFilterLinesCache;
   mutable QStringList m_stateFilterLinesCache;
+  // Compiled regex patterns for prefix filter (caches QRegularExpression per pattern)
+  mutable QMap<QString, QList<PrefixFilterEntry>> m_prefixFilterEntriesByBand;
 
   // Parallel FT8 decoder thread count (0 = OpenMP auto-detect; 1..12 = pinned).
   // Bound to the Decode > Parameters > Number of threads radio menu.
@@ -537,6 +576,9 @@ private:
   qint32 m_nFT8Cycles = 3;
   // Wideband DX call search (Decode > Wideband DX Call search). Drives dec_data.params.lwidedxcsearch.
   bool m_FT8WideDxCallSearch = false;
+
+  // DX Mode: Enable Integer Bin refinement (OFF by default; parabolic is default)
+  bool m_dx_mode = false;
 
   // Cached state of actionWSJT_Z_Debug to avoid widget lookup on every log() call.
   // Updated by the action's toggled signal in the ctor. Hot-path log() sites should
@@ -767,10 +809,12 @@ private:
   bool    m_autoCQAlternateEvenOddNext = false;
   QScopedPointer<UnfilteredView> m_unfilteredView;
   QScopedPointer<PSKReporterWidget> m_pskReporterView;
+  QScopedPointer<DXStationMap> m_dxStationMap;
   QSet<QString> m_pskReporterReceivers;
   QThread * m_pskReporterThread;
   QDateTime m_ignoreListReset;
   QDateTime m_watchdogAnchorUtc;
+  QDateTime m_lastRotateLogUtc;
   qint64 m_msTxFirst;
   bool m_TxFirstLock = false;
   bool m_savedAutoCQfiltering = false;
@@ -786,6 +830,8 @@ private:
   bool m_AutoTxFreq = false;
   int qso_total = 0;
   int qso_new = 0;
+  QDateTime m_dxMapStartedUtc;
+  QDateTime m_dxMapLastLogUtc;
   QByteArray m_unfilteredViewGeometry;
   QByteArray m_pskReporterViewGeometry;
   

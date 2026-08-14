@@ -5730,6 +5730,27 @@ void MainWindow::readFromStdout()                             //readFromStdout
       }
 
 //Left (Band activity) window
+      if (m_dxStationMap) {
+        auto const& dxmap_words0 = decodedtext0.messageWords();
+        bool const is_generic_cq0 = dxmap_words0.size() > 2 && dxmap_words0.at(2).startsWith("CQ");
+        auto const for_me0 = decodedtext0.string().contains(" " + my_call + " ") or
+                             decodedtext0.string().contains(" " + my_call) or
+                             decodedtext0.string().contains(my_call + " ") or
+                             decodedtext0.string().contains(" <" + my_call + "> ");
+        QString dxCall0, dxGrid0;
+        decodedtext0.deCallAndGrid(dxCall0, dxGrid0);
+        if (!dxCall0.isEmpty() && !dxGrid0.isEmpty()) {
+          PlottedStation s0;
+          s0.call = dxCall0;
+          s0.grid = dxGrid0.toUpper().left(4);
+          s0.snr = decodedtext0.snr();
+          s0.freqHz = decodedtext0.frequencyOffset();
+          s0.forMe = for_me0;
+          s0.isCQ = !for_me0 && is_generic_cq0;
+          s0.period = 0;
+          m_dxStationMap->addStation(s0);
+        }
+      }
       if(!bAvgMsg) {
         if(m_mode=="FT8" and SpecOp::FOX == m_specOp) {
           if(!m_bDisplayedOnce && !m_bandActivityRawView) {

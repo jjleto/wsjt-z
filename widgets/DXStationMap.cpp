@@ -1,3 +1,4 @@
+#include <QVector>
 #include "DXStationMap.h"
 #include <QPainter>
 #include <QPainterPath>
@@ -562,30 +563,39 @@ void DXStationMap::drawGreyline(QPainter &p) const
     while (subsolarLon > 180.0)  subsolarLon -= 360.0;
     while (subsolarLon < -180.0) subsolarLon += 360.0;
 
-    const double lonStepDeg = 7.0, latStepDeg = 7.0;
+    const double lonStepDeg = 4.0, latStepDeg = 4.0;
     p.setPen(Qt::NoPen);
-    p.setRenderHint(QPainter::Antialiasing, true);
-    
-    // Draw blocks with antialiasing and smooth twilight gradient
-    for (double lon = -180.0; lon < 180.0; lon += lonStepDeg) {
+    p.setRenderHint(QPainter::Antialiasing, false);  // avoid visible seams between adjacent night blocks
+
+    // Precompute shared projected coordinates ONCE per grid line, so adjacent
+    // blocks always share exact matching edges (no independent-rounding seams).
+    const int nLon = int(360.0 / lonStepDeg) + 1;
+    const int nLat = int(174.0 / latStepDeg) + 2;
+    QVector<double> xs(nLon), ys(nLat);
+    for (int i = 0; i < nLon; ++i) xs[i] = project(-180.0 + i * lonStepDeg, 0.0).x();
+    for (int j = 0; j < nLat; ++j) ys[j] = project(0.0, -87.0 + j * latStepDeg).y();
+
+    // Draw blocks with a smooth twilight gradient, using shared edge coordinates
+    for (int i = 0; i + 1 < nLon; ++i) {
+        const double lon = -180.0 + i * lonStepDeg;
         const double hourAngleRad = (lon - subsolarLon) * DEG;
         const double cosH = std::cos(hourAngleRad);
-        for (double lat = -87.0; lat < 87.0; lat += latStepDeg) {
+        for (int j = 0; j + 1 < nLat; ++j) {
+            const double lat = -87.0 + j * latStepDeg;
             const double latRad = lat * DEG;
             const double sinElev = std::sin(latRad)*std::sin(declRad)
                                   + std::cos(latRad)*std::cos(declRad)*cosH;
             if (sinElev >= 0.0) continue;   // daylight — leave clear
-            
+
             // Very smooth alpha: full opacity at night, wide fade through twilight band
             const double alpha = qBound(0.0, -sinElev / 0.15, 1.0);
-            
-            QPointF const c1 = project(lon, lat);
-            QPointF const c2 = project(lon + lonStepDeg, lat + latStepDeg);
-            const double cw = std::abs(c2.x() - c1.x()) + 1.0;
-            const double ch = std::abs(c2.y() - c1.y()) + 1.0;
-            
-            // Antialiased blocks with smooth overlay
-            p.fillRect(QRectF(c1.x(), c1.y(), cw, ch), QColor(20, 20, 40, int(alpha * 140)));
+
+            const double x1 = xs[i],   x2 = xs[i+1];
+            const double y1 = ys[j],   y2 = ys[j+1];
+            const QRectF rect(std::min(x1,x2), std::min(y1,y2),
+                               std::abs(x2-x1), std::abs(y2-y1));
+
+            p.fillRect(rect, QColor(20, 20, 40, int(alpha * 140)));
         }
     }
 }

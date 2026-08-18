@@ -221,6 +221,7 @@ public:
   void setPileupMode(bool enabled, bool autoCQfiltering);
   bool pileupMode() const;
   bool rxTotxFreq() const;
+  bool waitAndReply() const;
   bool udpFiltering() const;
   bool highlightDX() const;
   bool hideOwnCall() const;

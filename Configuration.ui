@@ -3854,6 +3854,16 @@ Right click for insert and delete options.</string>
              </property>
             </widget>
            </item>
+           <item row="4" column="1">
+            <widget class="QCheckBox" name="cb_waitAndReply">
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If a watchdog timeout occurs during a QSO (manual mode, not Auto CQ), stay listening on the current Rx frequency with the Call field intact. If the DX station replies later (e.g. after QSB), automatically re-enable Tx and reply, without needing to click Enable Tx manually.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="text">
+              <string>Wait and Reply after watchdog timeout</string>
+             </property>
+            </widget>
+           </item>
            <item row="2" column="0">
             <widget class="QCheckBox" name="cb_WD_resetAnywhere">
              <property name="toolTip">

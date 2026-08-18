@@ -821,6 +821,7 @@ private:
   bool pileupMode_;
   bool autoCQfiltering_;
   bool rxTotxFreq_;
+  bool waitAndReply_;
   bool udpFiltering_;
   bool highlightDX_;
   bool hideOwnCall_;
@@ -1004,6 +1005,7 @@ void Configuration::setPileupMode(bool enabled, bool autoCQfiltering)
 }
 bool Configuration::pileupMode() const {return m_->pileupMode_;}
 bool Configuration::rxTotxFreq() const {return m_->rxTotxFreq_;}
+bool Configuration::waitAndReply() const {return m_->waitAndReply_;}
 bool Configuration::udpFiltering() const {return m_->udpFiltering_;}
 bool Configuration::highlightDX() const {return m_->highlightDX_;}
 bool Configuration::hideOwnCall() const {return m_->hideOwnCall_;}
@@ -1875,6 +1877,7 @@ void Configuration::impl::initialize_models ()
   ui_->cb_colourAll->setChecked(colourAll_);
   ui_->cb_autoCQfiltering->setChecked(autoCQfiltering_);
   ui_->cb_rxTotxFreq->setChecked(rxTotxFreq_);
+  ui_->cb_waitAndReply->setChecked(waitAndReply_);
   ui_->cb_udpFiltering->setChecked(udpFiltering_);
   ui_->cb_highlightDX->setChecked(highlightDX_);
   ui_->cb_hideOwnCall->setChecked(hideOwnCall_);
@@ -2218,6 +2221,7 @@ void Configuration::impl::read_settings ()
   pileupMode_ = settings_->value("pileupMode", false).toBool();
   autoCQfiltering_ = settings_->value("autoCQfiltering").toBool();
   rxTotxFreq_ = settings_->value("rxTotxFreq").toBool();
+  waitAndReply_ = settings_->value("waitAndReply").toBool();
   udpFiltering_ = settings_->value("udpFiltering").toBool();
   highlightDX_ = settings_->value("highlightDX").toBool();
   hideOwnCall_ = settings_->value("hideOwnCall", false).toBool();
@@ -2464,6 +2468,7 @@ void Configuration::impl::write_settings ()
   settings_->setValue("pileupMode", pileupMode_);
   settings_->setValue("autoCQfiltering", autoCQfiltering_);
   settings_->setValue("rxTotxFreq", rxTotxFreq_);
+  settings_->setValue("waitAndReply", waitAndReply_);
   settings_->setValue("udpFiltering", udpFiltering_);
   settings_->setValue("highlightDX", highlightDX_);
   settings_->setValue("hideOwnCall", hideOwnCall_);
@@ -3042,6 +3047,7 @@ void Configuration::impl::accept ()
   disableWriteFoxQSO_ = ui_->cb_disableWriteFoxQSO->isChecked();
   colourAll_ = ui_->cb_colourAll->isChecked();
   rxTotxFreq_ = ui_->cb_rxTotxFreq->isChecked();
+  waitAndReply_ = ui_->cb_waitAndReply->isChecked();
   autoCQfiltering_ = ui_->cb_autoCQfiltering->isChecked();
   udpFiltering_ = ui_->cb_udpFiltering->isChecked();
   highlightDX_ = ui_->cb_highlightDX->isChecked();

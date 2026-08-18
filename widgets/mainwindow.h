@@ -1046,6 +1046,7 @@ private:
   bool m_tune;
   bool m_autoCQWatchdogPending = false;
   bool m_watchdogPendingDisable = false;
+  bool m_waitingForReply = false;   // "Wait and Reply": watchdog fired in manual mode, staying passively listening for the DX station to come back
   bool m_tx_watchdog;           // true when watchdog triggered
   bool m_block_pwr_tooltip;
   bool m_PwrBandSetOK;

@@ -3003,6 +3003,12 @@ void MainWindow::on_autoButton_clicked (bool checked)
   if (!checked) {
     m_bCallingCQ = false;
     filtered = false;
+    // "Wait and Reply": if the operator manually disables Tx (e.g. because
+    // the expected station is busy working someone else), arm the same
+    // passive-listening behaviour as a watchdog timeout - stay listening,
+    // and auto re-enable Tx once that station is heard again on a message
+    // relevant to us (see the check in auto_sequence()).
+    m_waitingForReply = m_config.waitAndReply () and not m_hisCall.trimmed ().isEmpty ();
   }
   statusUpdate ();
   m_bEchoTxOK=false;
@@ -3012,6 +3018,34 @@ void MainWindow::on_autoButton_clicked (bool checked)
   }
   m_tAutoOn=QDateTime::currentMSecsSinceEpoch()/1000;
   if(m_mode=="Echo") m_echoRunning=false;
+
+  // Manual re-enable supersedes passive "Wait and Reply" listening.
+  // (Only clear it here when actually re-enabling - the !checked branch
+  // above may have just armed it, and we must not immediately undo that.)
+  if (checked) m_waitingForReply = false;
+
+  // Z: when re-enabling Tx (e.g. after a watchdog timeout), reprocess the
+  // most recent RX-window decode so the reply picks up where the QSO
+  // actually left off, instead of silently restarting from the first
+  // message (call+grid) on the next incoming decode. Mirrors what a
+  // manual double-click on that same line would do.
+  // Guarded against reentrancy: processMessage() can itself toggle the
+  // auto button programmatically, which would otherwise recurse forever.
+  static bool s_replayInProgress = false;
+  if (checked && !s_replayInProgress
+      && ui->decodedTextBrowser2 && ui->decodedTextBrowser2->document ()
+      && !ui->decodedTextBrowser2->document ()->isEmpty ())
+    {
+      auto const& last_line = ui->decodedTextBrowser2->document ()->lastBlock ().text ().trimmed ();
+      if (!last_line.isEmpty ())
+        {
+          DecodedText last_message {QString {last_line}.left (61).remove ("TU; ")};
+          s_replayInProgress = true;
+          tx_watchdog (false);
+          processMessage (last_message, Qt::NoModifier);
+          s_replayInProgress = false;
+        }
+    }
 }
 
 void MainWindow::on_sbTxPercent_valueChanged (int n)
@@ -6351,6 +6385,35 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
     bool const directed_with_selected_dx = selected_dx_is_sender || selected_dx_is_target;
     bool const directed_to_me = sender_is_me || target_is_me;
 
+    // "Wait and Reply": if the watchdog fired earlier and we are passively
+    // waiting for this specific DX station to come back, only re-arm Tx if
+    // this message is actually relevant to us - a direct reply to our call,
+    // a fresh CQ from that station, or an RR73/73 aimed at us - not just
+    // any message that happens to mention their callsign as a third party.
+    if (m_waitingForReply and not m_hisCall.trimmed ().isEmpty ()
+        and Radio::base_callsign (hiscall) == Radio::base_callsign (m_hisCall))
+      {
+        bool const is_cq_from_them = message_words.size () > 2
+                                     && message_words.at (2).startsWith ("CQ");
+        // RR73/73 is a sign-off - it means the expected station just wrapped
+        // up a QSO (with us or, just as usefully, with a third party) and is
+        // free again. Use directed_with_selected_dx (already computed above:
+        // true if the expected station is either the sender or the target of
+        // this message, regardless of who the other party is) rather than
+        // directed_to_me, which only matches messages that mention our own
+        // callsign.
+        bool const is_73_raw = message_words.filter (QRegularExpression {"^(73|RR73)$"}).size ();
+        bool const is_73_relevant = is_73_raw && directed_with_selected_dx;
+        if (directed_to_me || is_cq_from_them || is_73_relevant)
+          {
+            m_waitingForReply = false;
+            tx_watchdog (false);
+            m_auto = true;
+            ui->autoButton->setChecked (true);
+            statusUpdate ();
+          }
+      }
+
     if (m_QSOProgress == SIGNOFF && !m_lastCall.isEmpty() && hiscall == m_lastCall) {
       if (m_zdebug) log(QString("auto_sequence: ignoring late duplicate response after logged signoff for %1").arg(hiscall));
       return;
@@ -7865,6 +7928,23 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
       || ("MSK144" == m_mode && !("&" == mode || "^" == mode))
       || ("Q65" == m_mode && mode.left (1) != ":")) {
     return;      //Currently we do auto-sequencing only in FT2, FT4, FT8, MSK144, FST4, and Q65
+  }
+
+  // "Wait and Reply": if the watchdog fired earlier and we are passively
+  // waiting for this specific DX station to come back, auto re-enable Tx
+  // now that a message from them has arrived, then let the normal flow
+  // below process it exactly as if the operator had just clicked Enable Tx.
+  if (m_waitingForReply and not m_hisCall.trimmed ().isEmpty ()) {
+    QString de_call, de_grid;
+    message.deCallAndGrid (/*out*/de_call, de_grid);
+    auto const from_call = Radio::base_callsign (de_call);
+    auto const expected_call = Radio::base_callsign (m_hisCall);
+    if (not from_call.isEmpty () and from_call == expected_call) {
+      m_waitingForReply = false;
+      tx_watchdog (false);
+      ui->autoButton->setChecked (true);
+      on_autoButton_clicked (true);
+    }
   }
 
   //Skip the rest if no decoded text extracted
@@ -12707,16 +12787,24 @@ void MainWindow::tx_watchdog (bool triggered)
                   m_idleMinutes = 0;
                   m_watchdogAnchorUtc = QDateTime::currentDateTimeUtc ();
                   update_watchdog_label ();
+                  clearDX();  // AutoCQ moves on to the next station
                 } else {
                   if (m_auto) auto_tx_mode (false);
                   if (m_tune) stop_tuning ();
                   tx_status_label.setStyleSheet ("QLabel{background-color: #ff0000}");
                   tx_status_label.setText (tr ("Runaway Tx watchdog"));
-                  if (m_config.rxTotxFreq()) on_pbT2R_clicked();
                   QApplication::alert (this);
+                  // Manual mode: keep the Call field populated and stay on the
+                  // current Rx frequency so a late reply from the DX station
+                  // (common on FT4/FT2) still gets heard and recognized.
+                  // Note: cb_rxTotxFreq ("Set RX freq to TX freq when finished
+                  // QSO") intentionally does NOT apply here — a watchdog
+                  // timeout is not a completed QSO.
+                  // "Wait and Reply": if enabled, arm passive listening so
+                  // processMessage() will auto re-enable Tx and reply when
+                  // the DX station comes back, without a manual click.
+                  m_waitingForReply = m_config.waitAndReply () and not m_hisCall.trimmed ().isEmpty ();
                 }
-
-      clearDX();
     }
   else
     {

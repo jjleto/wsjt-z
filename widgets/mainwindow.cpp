@@ -3024,28 +3024,14 @@ void MainWindow::on_autoButton_clicked (bool checked)
   // above may have just armed it, and we must not immediately undo that.)
   if (checked) m_waitingForReply = false;
 
-  // Z: when re-enabling Tx (e.g. after a watchdog timeout), reprocess the
-  // most recent RX-window decode so the reply picks up where the QSO
-  // actually left off, instead of silently restarting from the first
-  // message (call+grid) on the next incoming decode. Mirrors what a
-  // manual double-click on that same line would do.
-  // Guarded against reentrancy: processMessage() can itself toggle the
-  // auto button programmatically, which would otherwise recurse forever.
-  static bool s_replayInProgress = false;
-  if (checked && !s_replayInProgress
-      && ui->decodedTextBrowser2 && ui->decodedTextBrowser2->document ()
-      && !ui->decodedTextBrowser2->document ()->isEmpty ())
-    {
-      auto const& last_line = ui->decodedTextBrowser2->document ()->lastBlock ().text ().trimmed ();
-      if (!last_line.isEmpty ())
-        {
-          DecodedText last_message {QString {last_line}.left (61).remove ("TU; ")};
-          s_replayInProgress = true;
-          tx_watchdog (false);
-          processMessage (last_message, Qt::NoModifier);
-          s_replayInProgress = false;
-        }
-    }
+  // NOTE: an earlier version replayed the last RX-window decode here when
+  // Tx was re-enabled. That is removed: this slot also runs whenever the
+  // auto-sequencer re-enables Tx programmatically (e.g. with Auto Call),
+  // so the replay kept re-processing the previous QSO's last line and
+  // overwrote the freshly selected DX call - making the app keep calling
+  // an already-logged station. Resuming an interrupted QSO is now handled
+  // by the "Wait and Reply" check in auto_sequence(), which is driven by
+  // incoming decodes rather than by button state.
 }
 
 void MainWindow::on_sbTxPercent_valueChanged (int n)
@@ -6430,6 +6416,30 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
         || m_ignoredStationsCache.contains(Radio::base_callsign(hiscall)))) {
       return;
     }
+
+    // Z: in unattended modes (Auto Call / Auto CQ) do not start a new QSO with
+    // a station already worked on this band and mode - otherwise, right after
+    // logging, the very next CQ from that same station gets picked up again and
+    // the whole QSO is repeated. Uses the same worked-before data that drives
+    // the B4 highlighting. The current/last QSO partner stays exempt so closing
+    // messages (RR73/73) still advance and log the QSO in progress.
+    if (!is_current_qso_partner
+        && (ui->cbAutoCall->isChecked () || ui->cbAutoCQ->isChecked ())
+        && !hiscall.isEmpty ())
+      {
+        bool callB4 {false}, countryB4 {false}, gridB4 {false};
+        bool continentB4 {false}, CQZoneB4 {false}, ITUZoneB4 {false};
+        auto const& looked_up = m_logBook.countries ()->lookup (hiscall);
+        m_logBook.match (hiscall, m_mode, hisgrid, looked_up,
+                         callB4, countryB4, gridB4, continentB4, CQZoneB4, ITUZoneB4,
+                         m_currentBand);
+        if (callB4)
+          {
+            if (m_zdebug) log (QString ("auto_sequence: skipping %1 - already worked on %2 / %3")
+                               .arg (hiscall).arg (m_currentBand).arg (m_mode));
+            return;
+          }
+      }
 
     // Z TODO: This is inccorect - fix !m_config.superFox() && (SpecOp::HOUND != m_specOp)
     bool const auto_qrm_guard_state = m_QSOProgress == CALLING
@@ -12788,6 +12798,32 @@ void MainWindow::tx_watchdog (bool triggered)
                   m_watchdogAnchorUtc = QDateTime::currentDateTimeUtc ();
                   update_watchdog_label ();
                   clearDX();  // AutoCQ moves on to the next station
+                } else if (ui->cbAutoCall->isChecked ()) {
+                  // Auto Call: the station we were calling did not come back in
+                  // time, so drop it and let the automation pick the next one.
+                  // Unlike Auto CQ we do not switch to Tx6/CQ here - Auto Call
+                  // just needs a clean slate to select a new station from the
+                  // incoming decodes.
+                  if (m_tune) stop_tuning ();
+                  m_idleMinutes = 0;
+                  m_watchdogAnchorUtc = QDateTime::currentDateTimeUtc ();
+                  update_watchdog_label ();
+                  m_waitingForReply = false;
+                  clearDX ();
+                  auto_tx_mode (true);
+                } else if (ui->cbAutoCall->isChecked ()) {
+                  // Auto Call: the station we were calling did not come back in
+                  // time, so drop it and let the automation pick the next one.
+                  // Unlike Auto CQ we do not switch to Tx6/CQ here - Auto Call
+                  // just needs a clean slate to select a new station from the
+                  // incoming decodes.
+                  if (m_tune) stop_tuning ();
+                  m_idleMinutes = 0;
+                  m_watchdogAnchorUtc = QDateTime::currentDateTimeUtc ();
+                  update_watchdog_label ();
+                  m_waitingForReply = false;
+                  clearDX ();
+                  auto_tx_mode (true);
                 } else {
                   if (m_auto) auto_tx_mode (false);
                   if (m_tune) stop_tuning ();
